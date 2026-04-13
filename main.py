@@ -4,11 +4,11 @@ import time
 import requests
 import plotly.express as px
 import random
+import hashlib
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
-import hashlib
 
-# --- 1. 頁面設定 (必須在最前面) ---
+# --- 1. 頁面設定 ---
 st.set_page_config(page_title="Pro 通訊監測站", layout="wide")
 
 # --- 2. 全域資源共享 ---
@@ -48,26 +48,25 @@ elif "Android" in user_agent:
 else:
     icon, dev_type = "🌐", "Unknown Device"
 
-# 確保 Session 變數存在
 if 'history' not in st.session_state:
     st.session_state.history = []
 if 'my_sid' not in st.session_state:
     st.session_state.my_sid = f"{dev_type}_{ip}"
 
+# 【資安強化】生成去識別化的顯示 ID
 my_id = st.session_state.my_sid
 display_id = f"{dev_type}_{hashlib.md5(my_id.encode()).hexdigest()[:5]}"
 
-# 數據運算 (只執行一次)
+# 數據運算
 current_ping = random.randint(20, 45)
 st.session_state.history.append(current_ping)
 if len(st.session_state.history) > 20: 
     st.session_state.history.pop(0)
 
-# 更新自己到全域字典 (重要：確保資料先寫入，後面的 UI 才能讀)
+# 更新全域字典
 global_devices[my_id] = {
     "icon": icon,
-    "name": dev_type,
-    "ip": ip,
+    "display_name": display_id, # 存儲去識別化的名稱
     "lat": loc['lat'] if loc else 25.03,
     "lon": loc['lon'] if loc else 121.56,
     "city": loc['city'] if loc else "Unknown",
@@ -86,9 +85,9 @@ st.title("📡 Pro 智慧通訊監測平台")
 
 # 第一列：全局指標
 c1, c2, c3 = st.columns(3)
-c1.metric("在線裝置總數", f"{len(global_devices)} Units")
-c2.metric("當前節點延遲", f"{current_ping} ms", delta="-2ms" if current_ping < 30 else "Jittering")
-c3.metric("伺服器狀態", "🟢 Operational")
+c1.metric("目前在線裝置", f"{len(global_devices)} Units")
+c2.metric("即時延遲", f"{current_ping} ms", delta="-2ms" if current_ping < 30 else "Jittering")
+c3.metric("雲端節點狀態", "🟢 Operational")
 
 st.divider()
 
@@ -99,27 +98,29 @@ with col_left:
     st.subheader("📍 您的裝置診斷")
     with st.container(border=True):
         st.markdown(f"### {icon} {dev_type}")
-        st.write(f"🌐 **公網 IP:** `{ip}`")
-        st.write(f"🏙️ **偵測位置:** {global_devices[my_id]['city']}")
+        # 【修改點】不再顯示真實 IP，保護隱私
+        st.write(f"🆔 **匿名識別碼:** `{display_id}`")
+        st.write(f"🏙️ **地理位置:** {global_devices[my_id]['city']}")
         
         # 繪製延遲趨勢圖
         df_history = pd.DataFrame(st.session_state.history, columns=["Latency"])
-        fig = px.line(df_history, y="Latency", title="即時延遲趨勢 (ms)", template="plotly_dark")
+        fig = px.line(df_history, y="Latency", title="延遲波動趨勢 (ms)", template="plotly_dark")
         fig.update_layout(height=250, margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig, use_container_width=True)
 
 with col_right:
     st.subheader("🗺️ 全球連線分布")
-    # 準備地圖數據
     if global_devices:
         map_data = pd.DataFrame([
-            {"lat": v['lat'], "lon": v['lon'], "name": v['name']} 
+            {"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} 
             for v in global_devices.values()
         ])
         st.map(map_data, zoom=1)
         
-    with st.expander("查看所有在線名單"):
-        st.write(pd.DataFrame(global_devices).T[['name', 'last_seen']])
+    with st.expander("🔍 查看匿名在線名單"):
+        # 只顯示顯示名稱和時間，隱藏後台 ID
+        df_list = pd.DataFrame(global_devices).T[['display_name', 'last_seen']]
+        st.table(df_list)
 
 st.divider()
 
@@ -132,8 +133,8 @@ elif current_ping < 60:
 else:
     st.error("【警告】延遲過高，請檢查 Wi-Fi 分享器或重啟網路介面。")
 
-# 增加數據匯出功能 (專業加分點)
-if st.button("💾 下載本次監測數據 CSV"):
-    df_export = pd.DataFrame(st.session_state.history, columns=['Latency_ms'])
-    csv = df_export.to_csv(index=False).encode('utf-8')
-    st.download_button("確認下載", csv, "network_report.csv", "text/csv")
+# 數據匯出功能
+st.sidebar.header("📊 數據導出")
+df_export = pd.DataFrame(st.session_state.history, columns=['Latency_ms'])
+csv = df_export.to_csv(index=False).encode('utf-8')
+st.sidebar.download_button("💾 下載通訊報告 CSV", csv, "network_report.csv", "text/csv")
