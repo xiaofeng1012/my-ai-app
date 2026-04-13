@@ -117,10 +117,19 @@ with col_right:
         ])
         st.map(map_data, zoom=1)
         
-    with st.expander("🔍 查看匿名在線名單"):
-        # 只顯示顯示名稱和時間，隱藏後台 ID
-        df_list = pd.DataFrame(global_devices).T[['display_name', 'last_seen']]
-        st.table(df_list)
+with st.expander("🔍 查看匿名在線名單"):
+        if global_devices:
+            # 【關鍵修正】建立一個只包含顯示名稱與時間的列表，並忽略原始 Key
+            list_data = []
+            for sid, info in global_devices.items():
+                list_data.append({
+                    "裝置名稱": info['display_name'],
+                    "最後活動時間": info['last_seen']
+                })
+            
+            # 轉換為 DataFrame 並顯示，不顯示左側的索引序號
+            df_final_list = pd.DataFrame(list_data)
+            st.table(df_final_list)
 
 st.divider()
 
