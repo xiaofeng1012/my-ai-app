@@ -16,6 +16,7 @@ import streamlit.components.v1 as components
 lang_pack = {
     "繁體中文": {
         "title": "卡式如通訊品質監測平台",
+        "team_name": "卡式如研發團隊",
         "control_center": "控制中心",
         "speed_test": "即時效能測試",
         "sla_mode": "監測場景 (SLA Mode)",
@@ -39,6 +40,7 @@ lang_pack = {
     },
     "English": {
         "title": "KSR Network Telemetry Platform",
+        "team_name": "KSR R&D Team",
         "control_center": "CONTROL CENTER",
         "speed_test": "THROUGHPUT TEST",
         "sla_mode": "SLA Profile Selection",
@@ -62,7 +64,7 @@ lang_pack = {
     }
 }
 
-# --- 2. 頁面設定 ---
+# --- 2. 頁面設定 & UI 定製 ---
 st.set_page_config(page_title="KSR Monitoring Platform", layout="wide", page_icon="📡")
 
 st.markdown("""
@@ -73,6 +75,14 @@ st.markdown("""
         [data-testid="stMetricLabel"] { font-size: 14px !important; letter-spacing: 1px !important; text-transform: uppercase !important; color: #A1AAB5 !important; }
         [data-testid="stMetric"] { background-color: #161B22 !important; border: 1px solid #30363D !important; padding: 20px !important; border-radius: 10px !important; }
         .block-container { padding-top: 1.5rem; }
+        /* 自定義底部版權欄式樣 */
+        .ksr-footer {
+            text-align: center;
+            color: #30363D;
+            font-size: 12px;
+            padding: 20px;
+            letter-spacing: 1px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,16 +91,15 @@ def get_global_data(): return {}
 global_devices = get_global_data()
 st_autorefresh(interval=3000, key="data_refresh")
 
-# --- 3. 側邊欄 ---
-st.sidebar.title("🌐 Language / 語言")
-sel_lang = st.sidebar.selectbox("Select Language", ["繁體中文", "English"])
+# --- 3. 側邊欄：控制中心 ---
+st.sidebar.title("🌐 Language")
+sel_lang = st.sidebar.selectbox("Select Language", ["繁體中文", "English"], label_visibility="collapsed")
 L = lang_pack[sel_lang]
 
 st.sidebar.divider()
 st.sidebar.title(f"🛡️ {L['control_center']}")
 
 st.sidebar.subheader(f"🚀 {L['speed_test']}")
-# 修正後的 JS 組件，確保括號 {{ }} 正確轉義
 speed_test_js = f"""
 <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
     {L['speed_wait']}
@@ -123,6 +132,11 @@ with st.sidebar:
 
 st.sidebar.divider()
 app_mode = st.sidebar.selectbox(L['sla_mode'], L['modes'])
+
+# 側邊欄團隊標註
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"**Designed by {L['team_name']}**")
+st.sidebar.caption("Version 8.0.0-PRO | NOC Internal")
 
 # --- 4. 數據採集 ---
 headers = st.context.headers
@@ -180,20 +194,29 @@ with c_diag:
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="Time Sequence", yaxis_title="Latency (ms)")
     st.plotly_chart(fig, use_container_width=True)
     
-    csv_report = f"--- KSR AUDIT REPORT ---\nHash: {sys_hash}\nAvg: {df_raw['ms'].mean():.2f}ms\n\n" + df_raw.rename(columns={"time":"Timestamp","ms":"Latency_ms"}).to_csv(index=False)
-    st.download_button(f"📥 {L['export_btn']}", csv_report, f"Audit_{display_id}.csv", "text/csv")
+    # CSV 報告標註團隊
+    csv_report = f"--- KSR AUDIT REPORT ---\nIssued by: {lang_pack['English']['team_name']}\nHash: {sys_hash}\n\n" + df_raw.rename(columns={"time":"Timestamp","ms":"Latency_ms"}).to_csv(index=False)
+    st.download_button(f"📥 {L['export_btn']}", csv_report, f"KSR_Audit_{display_id}.csv", "text/csv")
 
 with c_map:
     st.subheader(f"🗺️ {L['map_title']}")
     map_df = pd.DataFrame([{"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} for v in global_devices.values()])
     st.map(map_df, zoom=1)
 
-# --- 7. 動態清單 ---
+# --- 7. 動態清單與頁尾標註 ---
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
 list_data = [{L['unit_name']: v['display_name'], L['location']: v['city'], L['last_seen']: v['last_seen']} for v in global_devices.values()]
 st.table(pd.DataFrame(list_data))
 
+# 底部版權標註
+st.markdown(f"""
+    <div class="ksr-footer">
+        DEVELOPED BY {lang_pack['English']['team_name'].upper()} &copy; 2026. ALL RIGHTS RESERVED.
+    </div>
+""", unsafe_allow_html=True)
+
+# 清理
 curr_t = time.time()
 for sid in list(global_devices.keys()):
     if curr_t - global_devices[sid]["timestamp"] > 15: del global_devices[sid]
