@@ -2,7 +2,6 @@
 import streamlit.components.v1 as components
 
 def render_speed_test_ui(L):
-    # 這裡處理 JS 轉義大括號問題
     js_code = f"""
     <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
         {L['speed_wait']}
