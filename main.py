@@ -117,7 +117,7 @@ with col_right:
         st.map(map_data, zoom=1)
         
     with st.expander("查看所有在線名單"):
-        st.write(pd.DataFrame(global_devices).T[['name', 'city', 'last_seen']])
+        st.write(pd.DataFrame(global_devices).T[['name', 'last_seen']])
 
 st.divider()
 
