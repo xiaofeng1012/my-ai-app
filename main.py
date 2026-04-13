@@ -6,6 +6,7 @@ import plotly.express as px
 import random
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
+import hashlib
 
 # --- 1. 頁面設定 (必須在最前面) ---
 st.set_page_config(page_title="Pro 通訊監測站", layout="wide")
@@ -54,6 +55,7 @@ if 'my_sid' not in st.session_state:
     st.session_state.my_sid = f"{dev_type}_{ip}"
 
 my_id = st.session_state.my_sid
+display_id = f"{dev_type}_{hashlib.md5(my_id.encode()).hexdigest()[:5]}"
 
 # 數據運算 (只執行一次)
 current_ping = random.randint(20, 45)
@@ -98,7 +100,7 @@ with col_left:
     with st.container(border=True):
         st.markdown(f"### {icon} {dev_type}")
         st.write(f"🌐 **公網 IP:** `{ip}`")
-        st.write(f"🏙️ **偵測位置:** {global_devices[my_id]['city']}")
+        st.write(f"🏙️ **偵測位置:** {global_devices[display_id]['city']}")
         
         # 繪製延遲趨勢圖
         df_history = pd.DataFrame(st.session_state.history, columns=["Latency"])
