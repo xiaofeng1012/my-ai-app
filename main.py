@@ -79,5 +79,5 @@ if my_id in global_devices:
             st.progress(90, text="Excellent (穩定連線中)")
 
 # --- 5. 自動重整 ---
-time.sleep(3)
+time.sleep(0)
 st.rerun()
