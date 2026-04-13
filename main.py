@@ -155,4 +155,33 @@ m1, m2, m3, m4 = st.columns(4)
 m1.metric("Online Units", f"{len(global_devices)}")
 m2.metric("Latency (RTT)", f"{current_ping} ms", delta=f"{current_ping - df_raw['ms'].iloc[-2] if len(df_raw)>1 else 0} ms", delta_color="inverse")
 m3.metric("Jitter (STD)", f"{jitter:.2f} ms")
-m4.metric("SLA Ratio",
+m4.metric("SLA Ratio", f"{sla_rate:.1f}%")
+
+st.divider()
+
+# --- 5. Diagnostic & Topology ---
+c_diag, c_map = st.columns([1.2, 1])
+with c_diag:
+    st.subheader("📊 Time-Domain Analysis")
+    fig = px.area(df_raw, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
+    fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="Time Sequence", yaxis_title="Latency (ms)")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    csv_data = get_audit_csv(df_raw, {"hash": sys_hash, "jitter": jitter, "dev_id": display_id})
+    st.download_button("📥 Export Audit Report (CSV)", csv_data, f"KSR_Audit_{display_id}.csv", "text/csv")
+
+with c_map:
+    st.subheader("🗺️ Global Topology")
+    map_df = pd.DataFrame([{"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} for v in global_devices.values()])
+    st.map(map_df, zoom=1)
+
+# --- 6. Active Nodes List ---
+st.divider()
+st.subheader("📋 Active Monitoring Nodes")
+list_data = [{"Unit Name": v['display_name'], "Location": v['city'], "Last Seen": v['last_seen']} for v in global_devices.values()]
+st.table(pd.DataFrame(list_data))
+
+# Cleanup timed-out sessions
+curr_t = time.time()
+for sid in list(global_devices.keys()):
+    if curr_t - global_devices[sid]["timestamp"] > 15: del global_devices[sid]
