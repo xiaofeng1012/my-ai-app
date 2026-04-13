@@ -12,7 +12,7 @@ from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components
 
-# --- 1. 語言包設定 (專業通訊術語) ---
+# --- 1. 語言包設定 ---
 lang_pack = {
     "繁體中文": {
         "title": "卡式如通訊品質監測平台",
@@ -62,7 +62,7 @@ lang_pack = {
     }
 }
 
-# --- 2. 頁面設定 & 專業去標籤化 ---
+# --- 2. 頁面設定 ---
 st.set_page_config(page_title="KSR Monitoring Platform", layout="wide", page_icon="📡")
 
 st.markdown("""
@@ -81,17 +81,16 @@ def get_global_data(): return {}
 global_devices = get_global_data()
 st_autorefresh(interval=3000, key="data_refresh")
 
-# --- 3. 側邊欄：語言切換與控制 ---
+# --- 3. 側邊欄 ---
 st.sidebar.title("🌐 Language / 語言")
 sel_lang = st.sidebar.selectbox("Select Language", ["繁體中文", "English"])
-L = lang_pack[sel_lang] # 取得當前語言包
+L = lang_pack[sel_lang]
 
 st.sidebar.divider()
 st.sidebar.title(f"🛡️ {L['control_center']}")
 
-# 測速組件 (JS 注入，語法隨語言調整)
 st.sidebar.subheader(f"🚀 {L['speed_test']}")
-# --- 側邊欄內的測速組件修正版 ---
+# 修正後的 JS 組件，確保括號 {{ }} 正確轉義
 speed_test_js = f"""
 <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
     {L['speed_wait']}
@@ -113,44 +112,6 @@ async function runSpeedTest() {{
             if (done) break;
             received += value.length;
         }}
-        const duration = (new Date().getTime() - startTime) / 1000;
-        display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
-    }} catch (e) {{ display.innerText = "ERROR"; }}
-}}
-</script>
-"""
-async function runSpeedTest() {{
-    const display = document.getElementById('speed-result');
-    display.innerText = "{L['speed_testing']}";
-    const startTime = new Date().getTime();
-    try {{
-        const response = await fetch('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv?n=' + startTime);
-        const reader = response.body.getReader();
-        let received = 0;
-        while(true) {{
-            const {{done, value}} = await reader.read();
-            if (done) break;
-            received += value.length;
-        }}
-        const duration = (new Date().getTime() - startTime) / 1000;
-        display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
-    }} catch (e) {{ display.innerText = "ERROR"; }}
-}}
-</script>
-"""
-async function runSpeedTest() {{
-    const display = document.getElementById('speed-result');
-    display.innerText = "{L['speed_testing']}";
-    const startTime = new Date().getTime();
-    try {{
-        const response = await fetch('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv?n=' + startTime);
-        const reader = response.body.getReader();
-        let received = 0;
-        while(true) {{
-            const {{done, value}} = await reader.read();
-            if (done) break;
-            received += value.length;
-        }
         const duration = (new Date().getTime() - startTime) / 1000;
         display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
     }} catch (e) {{ display.innerText = "ERROR"; }}
@@ -199,7 +160,7 @@ global_devices[my_id] = {
     "city": loc['city'] if loc else "Taipei", "last_seen": datetime.now().strftime("%H:%M:%S"), "timestamp": time.time()
 }
 
-# --- 5. 主視覺儀表板 (動態語言替換) ---
+# --- 5. 主視覺儀表板 ---
 st.title(f"📡 {L['title']}")
 st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{loc['city'] if loc else 'Detecting...'}`")
 
@@ -219,7 +180,6 @@ with c_diag:
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="Time Sequence", yaxis_title="Latency (ms)")
     st.plotly_chart(fig, use_container_width=True)
     
-    # CSV 導出 (表頭保持英文以確保相容性)
     csv_report = f"--- KSR AUDIT REPORT ---\nHash: {sys_hash}\nAvg: {df_raw['ms'].mean():.2f}ms\n\n" + df_raw.rename(columns={"time":"Timestamp","ms":"Latency_ms"}).to_csv(index=False)
     st.download_button(f"📥 {L['export_btn']}", csv_report, f"Audit_{display_id}.csv", "text/csv")
 
@@ -228,13 +188,12 @@ with c_map:
     map_df = pd.DataFrame([{"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} for v in global_devices.values()])
     st.map(map_df, zoom=1)
 
-# --- 7. 專業動態清單 ---
+# --- 7. 動態清單 ---
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
 list_data = [{L['unit_name']: v['display_name'], L['location']: v['city'], L['last_seen']: v['last_seen']} for v in global_devices.values()]
 st.table(pd.DataFrame(list_data))
 
-# 清理過期連線
 curr_t = time.time()
 for sid in list(global_devices.keys()):
     if curr_t - global_devices[sid]["timestamp"] > 15: del global_devices[sid]
