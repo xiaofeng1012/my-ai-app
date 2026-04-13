@@ -91,6 +91,7 @@ st.sidebar.title(f"🛡️ {L['control_center']}")
 
 # 測速組件 (JS 注入，語法隨語言調整)
 st.sidebar.subheader(f"🚀 {L['speed_test']}")
+# --- 側邊欄內的測速組件修正版 ---
 speed_test_js = f"""
 <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
     {L['speed_wait']}
@@ -99,6 +100,44 @@ speed_test_js = f"""
     {L['speed_btn']}
 </button>
 <script>
+async function runSpeedTest() {{
+    const display = document.getElementById('speed-result');
+    display.innerText = "{L['speed_testing']}";
+    const startTime = new Date().getTime();
+    try {{
+        const response = await fetch('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv?n=' + startTime);
+        const reader = response.body.getReader();
+        let received = 0;
+        while(true) {{
+            const {{done, value}} = await reader.read();
+            if (done) break;
+            received += value.length;
+        }}
+        const duration = (new Date().getTime() - startTime) / 1000;
+        display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
+    }} catch (e) {{ display.innerText = "ERROR"; }}
+}}
+</script>
+"""
+async function runSpeedTest() {{
+    const display = document.getElementById('speed-result');
+    display.innerText = "{L['speed_testing']}";
+    const startTime = new Date().getTime();
+    try {{
+        const response = await fetch('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv?n=' + startTime);
+        const reader = response.body.getReader();
+        let received = 0;
+        while(true) {{
+            const {{done, value}} = await reader.read();
+            if (done) break;
+            received += value.length;
+        }}
+        const duration = (new Date().getTime() - startTime) / 1000;
+        display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
+    }} catch (e) {{ display.innerText = "ERROR"; }}
+}}
+</script>
+"""
 async function runSpeedTest() {{
     const display = document.getElementById('speed-result');
     display.innerText = "{L['speed_testing']}";
