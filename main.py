@@ -45,11 +45,25 @@ elif "Android" in user_agent:
 else:
     icon, dev_type = "🌐", "Unknown Device"
 
-if 'my_sid' not in st.session_state:
-    st.session_state.my_sid = f"{dev_type}_{ip}"
+# 【關鍵修改 1】確保 history 獨立初始化，不受 my_sid 影響
+if 'history' not in st.session_state:
     st.session_state.history = []
 
+# 【關鍵修改 2】確保 my_sid 獨立初始化
+if 'my_sid' not in st.session_state:
+    st.session_state.my_sid = f"{dev_type}_{ip}"
+
 my_id = st.session_state.my_sid
+
+# --- 接下來再進行數據操作 ---
+import random
+current_ping = random.randint(20, 45)
+
+# 這樣這行絕對不會報錯了
+st.session_state.history.append(current_ping)
+
+if len(st.session_state.history) > 20: 
+    st.session_state.history.pop(0)
 
 # 模擬 Ping 值 (在免腳本環境中，我們用 RTT 模擬)
 import random
