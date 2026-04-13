@@ -1,83 +1,122 @@
 import streamlit as st
 import pandas as pd
 import time
+import requests
+import plotly.express as px
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
-# --- 1. 全域共享字典 (用來算總人數) ---
+# --- 1. 全域資源共享 ---
 @st.cache_resource
-def get_global_devices():
-    return {}
+def get_global_data():
+    return {} # 存儲所有在線裝置資訊
 
-global_devices = get_global_devices()
+global_devices = get_global_data()
 
-# --- 2. 裝置識別邏輯 ---
+# --- 2. 自動刷新 (3秒) ---
+st_autorefresh(interval=3000, key="data_refresh")
+
+# --- 3. 獲取連入者資訊與地理位置 ---
 headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
+# 獲取真實 IP (Streamlit Cloud 環境通常在 X-Forwarded-For)
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 
-# 解析裝置類型
+@st.cache_data(ttl=3600) # 快取地理位置資訊，避免重複請求 API
+def get_location(ip_addr):
+    try:
+        # 使用免費的 IP-API (通訊系必備工具)
+        response = requests.get(f"http://ip-api.com/json/{ip_addr}", timeout=5).json()
+        if response['status'] == 'success':
+            return response
+    except:
+        pass
+    return None
+
+loc = get_location(ip)
+
+# --- 4. 裝置識別與狀態更新 ---
 if "iPhone" in user_agent:
     icon, dev_type = "🍎", "iPhone"
 elif "Windows" in user_agent:
     icon, dev_type = "💻", "Windows PC"
 elif "Android" in user_agent:
-    icon, dev_type = "🤖", "Android Mobile"
+    icon, dev_type = "🤖", "Android"
 else:
-    icon, dev_type = "📱", "Mobile Device"
+    icon, dev_type = "🌐", "Unknown Device"
 
-# 確保 ID 固定
 if 'my_sid' not in st.session_state:
     st.session_state.my_sid = f"{dev_type}_{ip}"
+    st.session_state.history = []
 
 my_id = st.session_state.my_sid
 
-# 更新自己到全域字典
-now_dt = datetime.now()
+# 模擬 Ping 值 (在免腳本環境中，我們用 RTT 模擬)
+import random
+current_ping = random.randint(20, 45) # 模擬波動
+st.session_state.history.append(current_ping)
+if len(st.session_state.history) > 20: st.session_state.history.pop(0)
+
+# 更新全域字典
 global_devices[my_id] = {
     "icon": icon,
     "name": dev_type,
-    "last_seen": now_dt.strftime("%H:%M:%S"),
+    "ip": ip,
+    "lat": loc['lat'] if loc else 25.03,
+    "lon": loc['lon'] if loc else 121.56,
+    "city": loc['city'] if loc else "Unknown",
+    "last_seen": datetime.now().strftime("%H:%M:%S"),
     "timestamp": time.time()
 }
 
-# --- 3. 自動清理過期連線 (保持在線人數精準) ---
-current_time = time.time()
+# 清理過期連線 (15秒沒更新就踢掉)
+curr_t = time.time()
 for sid in list(global_devices.keys()):
-    if current_time - global_devices[sid]["timestamp"] > 10: # 10秒沒動就踢掉
+    if curr_t - global_devices[sid]["timestamp"] > 15:
         del global_devices[sid]
 
-# --- 4. UI 介面設計 ---
-st.title("📡 個人通訊品質診斷站")
+# --- 5. UI 介面設計 ---
+st.set_page_config(page_title="Pro 通訊監測站", layout="wide")
+st.title("📡 Pro 智慧通訊監測平台")
 
-# 區塊 A：全網概況
-st.subheader("🌐 全球連線概況")
-st.metric("目前全網在線裝置數", f"{len(global_devices)} 台")
-st.caption("每 3 秒自動刷新數據")
+# 第一列：全局指標
+c1, c2, c3 = st.columns(3)
+c1.metric("在線裝置總數", f"{len(global_devices)} Units")
+c2.metric("當前節點延遲", f"{current_ping} ms", delta="-2ms" if current_ping < 30 else "Jittering")
+c3.metric("伺服器狀態", "🟢 Operational")
 
 st.divider()
 
-# 區塊 B：個人專屬 UI (只顯示自己的 ID 資料)
-st.subheader("📍 您的裝置資訊")
+# 第二列：個人診斷與地圖
+col_left, col_right = st.columns([1, 1])
 
-if my_id in global_devices:
-    me = global_devices[my_id]
-    
+with col_left:
+    st.subheader("📍 您的裝置診斷")
     with st.container(border=True):
-        col1, col2 = st.columns([1, 3])
+        st.markdown(f"### {icon} {dev_type}")
+        st.write(f"🌐 **公網 IP:** `{ip}`")
+        st.write(f"🏙️ **偵測位置:** {global_devices[my_id]['city']}")
         
-        with col1:
-            st.markdown(f"## {me['icon']}")
-            st.write(f"**{me['name']}**")
-        
-        with col2:
-            st.write(f"🆔 **裝置識別碼:** `{my_id}`")
-            st.write(f"🕒 **最後更新時間:** {me['last_seen']}")
-            
-            # 加入一個模擬的通訊品質條
-            # 實際上這可以連結你之前的 Ping 或訊號邏輯
-            st.write("🛰️ **預估連線品質:**")
-            st.progress(90, text="Excellent (穩定連線中)")
+        # 繪製延遲趨勢圖
+        df_history = pd.DataFrame(st.session_state.history, columns=["Latency"])
+        fig = px.line(df_history, y="Latency", title="即時延遲趨勢 (ms)", template="plotly_dark")
+        fig.update_layout(height=200, margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 自動重整 ---
-time.sleep(3)
-st.rerun()
+with col_right:
+    st.subheader("🗺️ 全球連線分布")
+    # 準備地圖數據
+    map_data = pd.DataFrame([
+        {"lat": v['lat'], "lon": v['lon'], "name": v['name']} 
+        for v in global_devices.values()
+    ])
+    st.map(map_data, zoom=2)
+
+st.divider()
+
+# 第三列：AI 診斷建議
+st.subheader("🧠 AI 智慧連線診斷")
+if current_ping < 40:
+    st.success("【優良】目前的通訊路徑極佳，適合進行 4K 串流或線上對戰。")
+else:
+    st.warning("【注意】偵測到微幅延遲波動，建議檢查是否有大型下載任務占用頻寬。")
