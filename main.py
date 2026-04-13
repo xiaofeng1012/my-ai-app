@@ -12,10 +12,10 @@ from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components
 
-# --- 1. 頁面設定 & 專業去標籤化 ---
-st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
+# --- 1. System Config & De-branding ---
+st.set_page_config(page_title="KSR Network Monitoring", layout="wide", page_icon="📡")
 
-# 高階 CSS：移除品牌標記、優化卡片字體
+# Professional CSS: Large Fonts, Clear Layout, and Brand Concealment
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -51,11 +51,11 @@ def get_global_data(): return {}
 global_devices = get_global_data()
 st_autorefresh(interval=3000, key="data_refresh")
 
-# --- 2. 側邊欄：控制中心整合 (含測速儀) ---
-st.sidebar.title("🛡️ 控制中心")
+# --- 2. Sidebar: Control Center & Performance Tools ---
+st.sidebar.title("🛡️ CONTROL CENTER")
 
-# --- 這裡將測速儀移到最上方 ---
-st.sidebar.subheader("🚀 即時效能測試")
+# Speed Test Component (Client-side JS)
+st.sidebar.subheader("🚀 SPEED PERFORMANCE")
 speed_test_js = """
 <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
     STANDBY
@@ -85,29 +85,33 @@ async function runSpeedTest() {
 """
 with st.sidebar:
     components.html(speed_test_js, height=140)
-    st.caption("點擊按鈕測量與伺服器間的下載頻寬。")
+    st.caption("Measure the real-time download bandwidth.")
 
 st.sidebar.divider()
 
-# SLA 模式選擇
-app_mode = st.sidebar.selectbox("監測場景 (SLA Mode)", ["一般辦公", "即時競技", "遠距會議", "影音串流"])
+# SLA Mode Selection
+app_mode = st.sidebar.selectbox("SLA Mode Selection", ["Standard", "Gaming", "VoIP", "Streaming"])
 
-# 專業級 CSV 導出邏輯
+# Professional English CSV Audit Report Generator
 def get_audit_csv(df, info_dict):
     output = io.StringIO()
-    output.write(f"--- 卡式如通訊品質審計報告 ---\n")
-    output.write(f"系統 Hash: {info_dict['hash']}\n")
-    output.write(f"平均延遲: {df['ms'].mean():.2f} ms\n")
-    output.write(f"抖動指標: {info_dict['jitter']:.2f} ms\n")
-    output.write(f"--------------------------\n\n")
-    df.to_csv(output, index=False)
+    output.write(f"--- KSR NETWORK AUDIT REPORT ---\n")
+    output.write(f"System Hash, {info_dict['hash']}\n")
+    output.write(f"Device ID, {info_dict['dev_id']}\n")
+    output.write(f"Average Latency, {df['ms'].mean():.2f} ms\n")
+    output.write(f"Network Jitter, {info_dict['jitter']:.2f} ms\n")
+    output.write(f"Generation Time, {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    output.write(f"--------------------------------\n\n")
+    # Using English column names for better compatibility
+    df_export = df.rename(columns={"time": "Timestamp", "ms": "Latency_ms"})
+    df_export.to_csv(output, index=False)
     return output.getvalue()
 
 st.sidebar.divider()
-st.sidebar.caption("© 2026 卡式如研發團隊")
-st.sidebar.caption("Version 6.9.1 | NOC 內部工具")
+st.sidebar.caption("© 2026 KSR R&D Team")
+st.sidebar.caption("Version 7.0.0 | NOC INTERNAL ONLY")
 
-# --- 3. 數據核心 ---
+# --- 3. Data Core Engine ---
 headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
@@ -143,41 +147,12 @@ global_devices[my_id] = {
     "city": loc['city'] if loc else "Taipei", "last_seen": datetime.now().strftime("%H:%M:%S"), "timestamp": time.time()
 }
 
-# --- 4. 主視覺儀表板 ---
+# --- 4. Main Dashboard ---
 st.title("📡 卡式如通訊品質監測平台")
-st.markdown(f"**稽核編號:** `{sys_hash}` | **監測節點:** `{loc['city'] if loc else '自動定位'}`")
+st.markdown(f"**Audit Hash:** `{sys_hash}` | **Node:** `{loc['city'] if loc else 'Detecting...'}`")
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("全球監測單元", f"{len(global_devices)} Units")
-m2.metric("即時延遲 (RTT)", f"{current_ping} ms", delta=f"{current_ping - df_raw['ms'].iloc[-2] if len(df_raw)>1 else 0} ms", delta_color="inverse")
-m3.metric("網路抖動 (Jitter)", f"{jitter:.2f} ms")
-m4.metric("SLA 達標率", f"{sla_rate:.1f}%")
-
-st.divider()
-
-# --- 5. 診斷與地圖 ---
-c_diag, c_map = st.columns([1.2, 1])
-with c_diag:
-    st.subheader("📊 鏈路效能時域分析")
-    fig = px.area(df_raw, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
-    fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="時間序列", yaxis_title="延遲 (ms)")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    csv_data = get_audit_csv(df_raw, {"hash": sys_hash, "jitter": jitter})
-    st.download_button("📥 導出專業監測報告 (CSV)", csv_data, f"Audit_{display_id}.csv", "text/csv")
-
-with c_map:
-    st.subheader("🗺️ 全球節點拓撲")
-    map_df = pd.DataFrame([{"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} for v in global_devices.values()])
-    st.map(map_df, zoom=1)
-
-# --- 6. 專業動態清單 ---
-st.divider()
-st.subheader("📋 系統監測動態清單")
-list_data = [{"單位名稱": v['display_name'], "地理位置": v['city'], "活動時間": v['last_seen']} for v in global_devices.values()]
-st.table(pd.DataFrame(list_data))
-
-# 定時清理
-curr_t = time.time()
-for sid in list(global_devices.keys()):
-    if curr_t - global_devices[sid]["timestamp"] > 15: del global_devices[sid]
+m1.metric("Online Units", f"{len(global_devices)}")
+m2.metric("Latency (RTT)", f"{current_ping} ms", delta=f"{current_ping - df_raw['ms'].iloc[-2] if len(df_raw)>1 else 0} ms", delta_color="inverse")
+m3.metric("Jitter (STD)", f"{jitter:.2f} ms")
+m4.metric("SLA Ratio",
