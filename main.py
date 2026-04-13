@@ -97,22 +97,51 @@ global_devices[my_id] = {
     "city": loc['city'] if loc else "Taipei", "last_seen": datetime.now().strftime("%H:%M:%S"), "timestamp": time.time()
 }
 
-# --- 4. 儀表板 ---
+# --- 4. 頂部核心指標儀表板 (極簡大字版) ---
 st.title("📡 國家級通訊品質監測平台")
-st.markdown(f"**系統編號:** `{hashlib.sha1(display_id.encode()).hexdigest()[:12]}` | **地理節點:** `{loc['city'] if loc else '自動定位中'}`")
+st.caption(f"系統編號: {hashlib.sha1(display_id.encode()).hexdigest()[:12].upper()} | 地點: {loc['city'] if loc else '自動定位中'}")
 
+# 定義專業級大字體 CSS
+st.markdown(f"""
+<style>
+    /* 強制放大 Metric 數值與標題 */
+    [data-testid="stMetricValue"] {{
+        font-size: 52px !important;
+        font-weight: 800 !important;
+        color: white !important;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+    }}
+    [data-testid="stMetricLabel"] {{
+        font-size: 16px !important;
+        letter-spacing: 2px !important;
+        text-transform: uppercase !important;
+        color: #A1AAB5 !important;
+    }}
+    /* 卡片外框美化：深灰色簡約風 */
+    [data-testid="stMetric"] {{
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        padding: 20px !important;
+        border-radius: 8px !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# 渲染數據卡片 (使用 Streamlit 原生 columns)
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("全球監測單元", f"{len(global_devices)} Units")
-m2.metric("即時延遲 (RTT)", f"{current_ping} ms")
-m3.metric("網路抖動 (Jitter)", f"{jitter:.2f} ms")
-m4.metric("SLA 達標率", f"{sla_rate:.1f}%")
 
-if current_ping > t_val['ping']:
-    st.error(f"🚨 **[SLA 嚴重告警]** 延遲超過場景標準！")
-elif jitter > t_val['jitter']:
-    st.warning(f"⚠️ **[性能預警]** 偵測到抖動異常。")
+with m1:
+    st.metric("監測單元 (Units)", f"{len(global_devices)}")
+with m2:
+    # 加入 delta 顯示變化趨勢
+    delta_val = f"{current_ping - df_raw['ms'].iloc[-2]} ms" if len(df_raw) > 1 else None
+    st.metric("即時延遲 (RTT)", f"{current_ping} ms", delta=delta_val, delta_color="inverse")
+with m3:
+    st.metric("網路抖動 (Jitter)", f"{jitter:.2f} ms")
+with m4:
+    st.metric("SLA 達標率", f"{sla_rate:.1f}%")
 
-st.divider()
+# (下方接著原本的智慧告警引擎代碼)
 
 # --- 5. 診斷介面 ---
 col_diag, col_map = st.columns([1.2, 1])
