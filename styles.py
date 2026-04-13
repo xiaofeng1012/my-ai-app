@@ -4,11 +4,13 @@ import streamlit as st
 def apply_ksr_styles():
     st.markdown("""
         <style>
-            /* 隱藏所有 Streamlit 標記 */
-            #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+            /* 徹底去標籤化 */
+            #MainMenu {visibility: hidden;} 
+            footer {visibility: hidden;} 
+            header {visibility: hidden;}
             div[data-testid="stToolbar"] {visibility: hidden;}
             
-            /* 工業級大字體 Metric */
+            /* 工業級大字體 Metrics */
             [data-testid="stMetricValue"] { 
                 font-size: 52px !important; 
                 font-weight: 800 !important; 
@@ -29,7 +31,7 @@ def apply_ksr_styles():
             }
             .block-container { padding-top: 1.5rem; }
             .ksr-footer {
-                text-align: center; color: #30363D; font-size: 12px; padding: 20px; letter-spacing: 1px;
+                text-align: center; color: #30363D; font-size: 11px; padding: 25px; letter-spacing: 1px;
             }
         </style>
     """, unsafe_allow_html=True)
