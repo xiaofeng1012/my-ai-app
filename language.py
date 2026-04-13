@@ -1,13 +1,51 @@
-# language.py
+# language_pack.py
 lang_pack = {
     "繁體中文": {
         "title": "卡式如通訊品質監測平台",
         "team_name": "卡式如研發團隊",
-        # ... 複製原本的中文內容 ...
+        "control_center": "控制中心",
+        "speed_test": "即時效能測試",
+        "sla_mode": "監測場景 (SLA Mode)",
+        "audit_hash": "稽核編號",
+        "node": "監測節點",
+        "m1": "全球監測單元",
+        "m2": "即時延遲 (RTT)",
+        "m3": "網路抖動 (Jitter)",
+        "m4": "SLA 達標率",
+        "diag_title": "鏈路效能時域分析",
+        "map_title": "全球節點拓撲",
+        "list_title": "系統監測動態清單",
+        "export_btn": "導出專業監測報告 (CSV)",
+        "unit_name": "單位名稱",
+        "location": "地理位置",
+        "last_seen": "最後活動紀錄",
+        "speed_btn": "開始測速",
+        "speed_wait": "等待指令...",
+        "speed_testing": "測試中...",
+        "modes": ["一般辦公", "即時競技", "遠距會議", "影音串流"]
     },
     "English": {
         "title": "KSR Network Telemetry Platform",
         "team_name": "KSR R&D Team",
-        # ... 複製原本的英文內容 ...
+        "control_center": "CONTROL CENTER",
+        "speed_test": "THROUGHPUT TEST",
+        "sla_mode": "SLA Profile Selection",
+        "audit_hash": "Audit Hash",
+        "node": "Active Node",
+        "m1": "Monitoring Units",
+        "m2": "RTT Latency",
+        "m3": "Network Jitter",
+        "m4": "SLA Compliance",
+        "diag_title": "Time-Domain Performance Analysis",
+        "map_title": "Global Topology Map",
+        "list_title": "Active Node Registry",
+        "export_btn": "Export Audit Report (CSV)",
+        "unit_name": "Unit Identifier",
+        "location": "Geolocation",
+        "last_seen": "Last Heartbeat",
+        "speed_btn": "RUN SPEED TEST",
+        "speed_wait": "STANDBY",
+        "speed_testing": "TESTING...",
+        "modes": ["Standard", "Gaming", "VoIP", "Streaming"]
     }
 }
