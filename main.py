@@ -17,29 +17,29 @@ st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide"
 
 # 自定義 CSS (強化大字體與清晰排版)
 st.markdown(f"""
-<style>
-    [data-testid="stMetricValue"] {{ font-size: 52px !important; font-weight: 800 !important; color: white !important; }}
-    [data-testid="stMetricLabel"] {{ font-size: 16px !important; letter-spacing: 2px !important; text-transform: uppercase !important; color: #A1AAB5 !important; }}
-    [data-testid="stMetric"] {{ background-color: #161B22 !important; border: 1px solid #30363D !important; padding: 20px !important; border-radius: 8px !important; }}
-    .stButton>button {{ width: 100%; border-radius: 5px; height: 3em; background-color: #00f2ff; color: black; font-weight: bold; }}
-    /* 1. 隱藏右上角的 Streamlit 選單 (三條線) */
-    #MainMenu {visibility: hidden;}
+    <style>
+        [data-testid="stMetricValue"] {{ font-size: 52px !important; font-weight: 800 !important; color: white !important; }}
+        [data-testid="stMetricLabel"] {{ font-size: 16px !important; letter-spacing: 2px !important; text-transform: uppercase !important; color: #A1AAB5 !important; }}
+        [data-testid="stMetric"] {{ background-color: #161B22 !important; border: 1px solid #30363D !important; padding: 20px !important; border-radius: 8px !important; }}
+        .stButton>button {{ width: 100%; border-radius: 5px; height: 3em; background-color: #00f2ff; color: black; font-weight: bold; }}
+        /* 1. 隱藏右上角的 Streamlit 選單 (三條線) */
+        #MainMenu {visibility: hidden;}
+        
+        /* 2. 隱藏底部的 "Made with Streamlit" 標籤 */
+        footer {visibility: hidden;}
+        
+        /* 3. 隱藏頂部載入時的紅色裝飾條 */
+        header {visibility: hidden;}
     
-    /* 2. 隱藏底部的 "Made with Streamlit" 標籤 */
-    footer {visibility: hidden;}
+        /* 4. 調整頁面頂部間距，讓排版更緊湊專業 */
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 0rem;
+        }
     
-    /* 3. 隱藏頂部載入時的紅色裝飾條 */
-    header {visibility: hidden;}
-
-    /* 4. 調整頁面頂部間距，讓排版更緊湊專業 */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 0rem;
-    }
-
-    /* 5. 統一字體與美化 Metrics (維持你之前要求的大字體) */
-    [data-testid="stMetricValue"] { font-size: 52px !important; font-weight: 800 !important; }
-</style>
+        /* 5. 統一字體與美化 Metrics (維持你之前要求的大字體) */
+        [data-testid="stMetricValue"] { font-size: 52px !important; font-weight: 800 !important; }
+    </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
