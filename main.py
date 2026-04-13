@@ -100,7 +100,7 @@ with col_left:
     with st.container(border=True):
         st.markdown(f"### {icon} {dev_type}")
         st.write(f"🌐 **公網 IP:** `{ip}`")
-        st.write(f"🏙️ **偵測位置:** {global_devices[display_id]['city']}")
+        st.write(f"🏙️ **偵測位置:** {global_devices[my_id]['city']}")
         
         # 繪製延遲趨勢圖
         df_history = pd.DataFrame(st.session_state.history, columns=["Latency"])
