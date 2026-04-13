@@ -127,14 +127,14 @@ with col_left:
         fig.update_layout(height=200, margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-with col_right:
+'''with col_right:
     st.subheader("🗺️ 全球連線分布")
     # 準備地圖數據
     map_data = pd.DataFrame([
         {"lat": v['lat'], "lon": v['lon'], "name": v['name']} 
         for v in global_devices.values()
     ])
-    st.map(map_data, zoom=2)
+    st.map(map_data, zoom=2)'''
 
 st.divider()
 
