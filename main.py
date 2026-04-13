@@ -10,14 +10,14 @@ import plotly.express as px
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 
-# 匯入自定義模組 (請確保檔案都在同一目錄下)
+# 匯入自定義模組
 from language_pack import lang_pack
 from styles import apply_ksr_styles
 from components import render_speed_test_ui
 from utils import generate_csv_report
 
 # --- 1. 系統初始化 ---
-st.set_page_config(page_title="KSR Monitoring Platform", layout="wide", page_icon="📡")
+st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
 apply_ksr_styles()
 st_autorefresh(interval=3000, key="data_refresh")
 
@@ -28,19 +28,26 @@ if 'history' not in st.session_state:
 def get_global_data(): return {} 
 global_devices = get_global_data()
 
-# --- 2. 側邊欄：多語言與控制中心 ---
+# --- 2. 側邊欄控制中心 ---
 st.sidebar.title("🌐 Language Selection")
 sel_lang = st.sidebar.selectbox("Language", ["繁體中文", "English"], label_visibility="collapsed")
 L = lang_pack[sel_lang]
 
 st.sidebar.divider()
 st.sidebar.title(f"🛡️ {L['control_center']}")
+
+# A. 監測場景選擇 (放在上方)
+app_mode = st.sidebar.selectbox(L['sla_mode'], L['modes'])
+
+st.sidebar.divider()
+
+# B. 效能測試 (放在下方)
+st.sidebar.subheader(f"🚀 {L['speed_test']}")
 render_speed_test_ui(L)
 
 st.sidebar.divider()
-app_mode = st.sidebar.selectbox(L['sla_mode'], L['modes'])
 st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-st.sidebar.caption("Version 8.2.0-FINAL | KSR NOC")
+st.sidebar.caption("Version 8.3.0 | KSR NOC Internal")
 
 # --- 3. Telemetry 數據處理 ---
 headers = st.context.headers
@@ -64,19 +71,13 @@ st.session_state.history.append({"time": datetime.now().strftime("%H:%M:%S"), "m
 if len(st.session_state.history) > 40: st.session_state.history.pop(0)
 
 df_raw = pd.DataFrame(st.session_state.history)
-
-# 核心指標計算
 jitter = np.mean(np.abs(np.diff(df_raw['ms']))) if len(df_raw) > 1 else 0
 sla = (sum(1 for p in df_raw['ms'] if p < 60)/len(df_raw)*100)
 
-# 全網數據更新
 global_devices[display_id] = {
-    "name": display_id, 
-    "city": loc['city'] if loc else "Unknown", 
-    "lat": loc['lat'] if loc else 25.03, 
-    "lon": loc['lon'] if loc else 121.56,
-    "last": datetime.now().strftime("%H:%M:%S"), 
-    "ts": time.time()
+    "name": display_id, "city": loc['city'] if loc else "Unknown", 
+    "lat": loc['lat'] if loc else 25.03, "lon": loc['lon'] if loc else 121.56,
+    "last": datetime.now().strftime("%H:%M:%S"), "ts": time.time()
 }
 
 # --- 4. Dashboard 介面渲染 ---
@@ -98,20 +99,15 @@ with c_diag:
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0))
     st.plotly_chart(fig, use_container_width=True)
     
-    # 導出 CSV (帶入英文團隊名稱確保編碼)
     csv_data = generate_csv_report(df_raw, sys_hash, display_id, lang_pack['English']['team_name'])
     st.download_button(f"📥 {L['export_btn']}", csv_data, f"KSR_Audit_{display_id}.csv", "text/csv")
 
 with c_map:
     st.subheader(f"🗺️ {L['map_title']}")
     if global_devices:
-        map_df = pd.DataFrame([
-            {"lat": v.get('lat', 25.03), "lon": v.get('lon', 121.56), "name": v.get('name', 'Unknown')} 
-            for v in global_devices.values()
-        ])
+        map_df = pd.DataFrame([{"lat": v.get('lat', 25.03), "lon": v.get('lon', 121.56), "name": v.get('name', 'Unknown')} for v in global_devices.values()])
         st.map(map_df, zoom=1)
 
-# --- 5. 名單與頁尾 ---
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
 st.table(pd.DataFrame([{L['unit_name']: v['name'], L['location']: v['city'], L['last_seen']: v['last']} for v in global_devices.values()]))
@@ -119,7 +115,7 @@ st.table(pd.DataFrame([{L['unit_name']: v['name'], L['location']: v['city'], L['
 # 版權標註
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {lang_pack["English"]["team_name"].upper()} &copy; 2026. ALL RIGHTS RESERVED.</div>', unsafe_allow_html=True)
 
-# 節點超時清理 (15秒)
+# 清理超時
 ct = time.time()
 for sid in list(global_devices.keys()):
     if ct - global_devices[sid]["ts"] > 15: del global_devices[sid]
