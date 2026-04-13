@@ -13,7 +13,7 @@ from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components
 
 # --- 1. 頁面設定 ---
-st.set_page_config(page_title="國家級通訊品質監測系統", layout="wide", page_icon="📡")
+st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
 
 # 自定義 CSS (強化大字體與清晰排版)
 st.markdown(f"""
@@ -32,11 +32,11 @@ global_devices = get_global_data()
 st_autorefresh(interval=3000, key="data_refresh")
 
 # --- 2. 側邊欄：功能控管與測速儀 ---
-st.sidebar.title("🛡️ 系統控制中心")
+st.sidebar.title("🛡️ 控制中心")
 app_mode = st.sidebar.selectbox("監測應用場景 (SLA)", ["一般辦公 (Standard)", "即時競技 (Gaming)", "遠距會議 (VoIP)", "高畫質影音 (Streaming)"])
 
 st.sidebar.divider()
-st.sidebar.subheader("🚀 即時效能測試")
+st.sidebar.subheader("🚀 效能測試")
 
 # 測速組件：使用 JavaScript 測量客戶端與伺服器間的下載速度
 speed_test_js = """
@@ -115,7 +115,7 @@ global_devices[my_id] = {
 }
 
 # --- 4. 大氣排版儀表板 ---
-st.title("📡 國家級通訊品質監測平台")
+st.title("📡 卡式如通訊品質監測平台")
 st.markdown(f"**系統編號:** `{hashlib.sha1(display_id.encode()).hexdigest()[:12].upper()}` | **當前節點:** `{loc['city'] if loc else '自動定位'}`")
 
 m1, m2, m3, m4 = st.columns(4)
@@ -129,22 +129,22 @@ st.divider()
 # --- 5. 診斷區與地圖 ---
 col_diag, col_map = st.columns([1.2, 1])
 with col_diag:
-    st.subheader("📈 鏈路效能深度分析")
+    st.subheader("📈 效能分析")
     fig = px.area(df_raw, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
 with col_map:
-    st.subheader("🗺️ 全球節點分佈圖")
+    st.subheader("🗺️ 全球節點分佈")
     if global_devices:
         map_df = pd.DataFrame([{"lat": v['lat'], "lon": v['lon'], "name": v['display_name']} for v in global_devices.values()])
         st.map(map_df, zoom=1)
 
 # --- 6. 專業動態清單 (直接顯示在最下方) ---
 st.divider()
-st.subheader("📋 全球監測節點動態清單")
+st.subheader("📋 全球監測動態清單")
 if global_devices:
-    list_data = [{"監測單元名稱": v['display_name'], "地理位置": v['city'], "最後活動紀錄": v['last_seen']} for v in global_devices.values()]
+    list_data = [{"單位名稱": v['display_name'], "位置": v['city'], "最後紀錄": v['last_seen']} for v in global_devices.values()]
     st.table(pd.DataFrame(list_data))
 
 # 定時清理
