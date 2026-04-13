@@ -72,16 +72,26 @@ st.session_state.history.append(current_ping)
 if len(st.session_state.history) > 20: st.session_state.history.pop(0)
 
 # 更新全域字典
-global_devices[my_id] = {
-    "icon": icon,
-    "name": dev_type,
-    "ip": ip,
-    "lat": loc['lat'] if loc else 25.03,
-    "lon": loc['lon'] if loc else 121.56,
-    "city": loc['city'] if loc else "Unknown",
-    "last_seen": datetime.now().strftime("%H:%M:%S"),
-    "timestamp": time.time()
-}
+# --- 強化版：全球在線地圖 ---
+st.subheader("🗺️ 全球在線裝置分布")
+
+# 準備所有裝置的地圖數據
+if global_devices:
+    map_list = []
+    for sid, info in global_devices.items():
+        map_list.append({
+            "lat": info['lat'],
+            "lon": info['lon'],
+            "name": f"{info['name']} ({info['city']})"
+        })
+    df_map = pd.DataFrame(map_list)
+    
+    # 使用 st.map 自動繪製所有點
+    st.map(df_map, zoom=1) 
+    
+    # 下方顯示一個小列表
+    with st.expander("查看在線名單"):
+        st.table(df_map)
 
 # 清理過期連線 (15秒沒更新就踢掉)
 curr_t = time.time()
