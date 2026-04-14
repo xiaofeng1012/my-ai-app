@@ -7,7 +7,8 @@ import hashlib
 import time
 import numpy as np
 import plotly.express as px
-from datetime import datetime
+# 修正處：引入時區相關模組
+from datetime import datetime, timedelta, timezone 
 from streamlit_autorefresh import st_autorefresh
 
 # 匯入自定義模組
@@ -23,21 +24,24 @@ st.set_page_config(
     page_icon="📡"
 )
 
+# 定義台北時區 (UTC+8)
+tw_tz = timezone(timedelta(hours=8))
+
 # 套用客製化 CSS
 apply_ksr_styles()
 
 # 設定自動刷新 (3秒)
 st_autorefresh(interval=3000, key="data_refresh")
 
-# 初始化 session state
+# 初始化 session state (使用台北時間)
 if 'history' not in st.session_state: 
-    st.session_state.history = [{"time": datetime.now().strftime("%H:%M:%S"), "ms": 30}]
+    st.session_state.history = [{"time": datetime.now(tw_tz).strftime("%H:%M:%S"), "ms": 30}]
 
 @st.cache_resource
 def get_global_data(): return {} 
 global_devices = get_global_data()
 
-# --- 2. 側邊欄控制中心 (確保元件完全相容) ---
+# --- 2. 側邊欄控制中心 ---
 with st.sidebar:
     st.title("🌐 Language Selection")
     sel_lang = st.selectbox("Language", ["繁體中文", "English"], label_visibility="collapsed")
@@ -51,17 +55,16 @@ with st.sidebar:
 
     st.divider()
 
-    # B. 即時效能測試 (渲染於側邊欄)
+    # B. 即時效能測試
     st.subheader(f"🚀 {L['speed_test']}")
-    # 這裡調用修正後的 components.py
     render_speed_test_ui(L)
 
     st.divider()
     st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-    st.sidebar.caption("Version 8.7.5-STABLE | KSR NOC")
+    st.sidebar.caption("Version 8.8.0-TZ | KSR NOC")
 
 
-# --- 3. Telemetry 數據處理 ---
+# --- 3. Telemetry 數據處理 (時區同步) ---
 headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
@@ -84,7 +87,8 @@ else:
 display_id = f"{dev_type}_{hashlib.md5(f'{dev_type}_{ip}'.encode()).hexdigest()[:5]}"
 sys_hash = hashlib.sha1(display_id.encode()).hexdigest()[:12].upper()
 
-current_now = datetime.now().strftime("%H:%M:%S")
+# 關鍵修正：確保所有地方都使用 tw_tz
+current_now = datetime.now(tw_tz).strftime("%H:%M:%S")
 
 curr_p = random.randint(22, 55)
 st.session_state.history.append({"time": current_now, "ms": curr_p})
@@ -99,7 +103,7 @@ global_devices[display_id] = {
     "city": loc['city'] if loc else "Unknown", 
     "lat": loc['lat'] if loc else 25.03, 
     "lon": loc['lon'] if loc else 121.56,
-    "last": current_now,
+    "last": current_now, # 使用校準後的台北時間
     "ts": time.time()
 }
 
@@ -120,8 +124,6 @@ with c_diag:
     st.subheader(f"📊 {L['diag_title']}")
     fig = px.area(df_raw, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0))
-    
-    # 修正點：使用相容性最高的參數
     st.plotly_chart(fig, use_container_width=True)
     
     csv_data = generate_csv_report(df_raw, sys_hash, display_id, lang_pack['English']['team_name'])
@@ -138,6 +140,7 @@ with c_map:
 
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
+# 這裡顯示的表格，時間現在也會是準確的台灣時間
 st.table(pd.DataFrame([{L['unit_name']: v['name'], L['location']: v['city'], L['last_seen']: v['last']} for v in global_devices.values()]))
 
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {lang_pack["English"]["team_name"].upper()} &copy; 2026. ALL RIGHTS RESERVED.</div>', unsafe_allow_html=True)
