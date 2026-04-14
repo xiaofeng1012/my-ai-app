@@ -7,8 +7,7 @@ import hashlib
 import time
 import numpy as np
 import plotly.express as px
-# 修正處：引入時區相關模組
-from datetime import datetime, timedelta, timezone 
+from datetime import datetime, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
 
 # 匯入自定義模組
@@ -24,16 +23,16 @@ st.set_page_config(
     page_icon="📡"
 )
 
-# 定義台北時區 (UTC+8)
+# 定義台北時區
 tw_tz = timezone(timedelta(hours=8))
 
 # 套用客製化 CSS
 apply_ksr_styles()
 
-# 設定自動刷新 (3秒)
-st_autorefresh(interval=3000, key="data_refresh")
+# 🔥 核心修改：設定每秒刷新 (1000ms)
+st_autorefresh(interval=1000, key="data_refresh_1s")
 
-# 初始化 session state (使用台北時間)
+# 初始化 session state
 if 'history' not in st.session_state: 
     st.session_state.history = [{"time": datetime.now(tw_tz).strftime("%H:%M:%S"), "ms": 30}]
 
@@ -49,22 +48,18 @@ with st.sidebar:
 
     st.divider()
     st.title(f"🛡️ {L['control_center']}")
-
-    # A. 監測場景選擇
     app_mode = st.selectbox(L['sla_mode'], L['modes'])
 
     st.divider()
-
-    # B. 即時效能測試
     st.subheader(f"🚀 {L['speed_test']}")
     render_speed_test_ui(L)
 
     st.divider()
     st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-    st.sidebar.caption("Version 8.8.0-TZ | KSR NOC")
+    st.sidebar.caption("Version 8.8.5-REALTIME | KSR NOC")
 
 
-# --- 3. Telemetry 數據處理 (時區同步) ---
+# --- 3. Telemetry 數據處理 ---
 headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
@@ -72,7 +67,7 @@ ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 @st.cache_data(ttl=3600)
 def get_loc(ip_addr):
     try:
-        r = requests.get(f"http://ip-api.com/json/{ip_addr}", timeout=5).json()
+        r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=5).json()
         return r if r['status'] == 'success' else None
     except: return None
 
@@ -87,7 +82,7 @@ else:
 display_id = f"{dev_type}_{hashlib.md5(f'{dev_type}_{ip}'.encode()).hexdigest()[:5]}"
 sys_hash = hashlib.sha1(display_id.encode()).hexdigest()[:12].upper()
 
-# 關鍵修正：確保所有地方都使用 tw_tz
+# 獲取校準後的台北時間
 current_now = datetime.now(tw_tz).strftime("%H:%M:%S")
 
 curr_p = random.randint(22, 55)
@@ -98,19 +93,27 @@ df_raw = pd.DataFrame(st.session_state.history)
 jitter = np.mean(np.abs(np.diff(df_raw['ms']))) if len(df_raw) > 1 else 0
 sla = (sum(1 for p in df_raw['ms'] if p < 60)/len(df_raw)*100)
 
+# 更新全域節點清單
 global_devices[display_id] = {
     "name": display_id, 
-    "city": loc['city'] if loc else "Unknown", 
+    "country": loc['country'] if loc else "Unknown", 
     "lat": loc['lat'] if loc else 25.03, 
     "lon": loc['lon'] if loc else 121.56,
-    "last": current_now, # 使用校準後的台北時間
+    "last": current_now,
     "ts": time.time()
 }
 
+# 🔥 每秒清理邏輯：若裝置 8 秒內沒刷新就視為斷線
+ct = time.time()
+for sid in list(global_devices.keys()):
+    if ct - global_devices[sid]["ts"] > 8: 
+        del global_devices[sid]
+
 # --- 4. Dashboard 主介面渲染 ---
 st.title(f"📡 {L['title']}")
-st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{loc['city'] if loc else 'Detecting...'}`")
+st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{loc['country'] if loc else 'Detecting...'}`")
 
+# 這裡的 len(global_devices) 現在會每秒更新
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(L['m1'], f"{len(global_devices)} Units")
 m2.metric(L['m2'], f"{curr_p} ms", delta=f"{curr_p - df_raw['ms'].iloc[-2] if len(df_raw)>1 else 0} ms", delta_color="inverse")
@@ -140,11 +143,12 @@ with c_map:
 
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
-# 這裡顯示的表格，時間現在也會是準確的台灣時間
-st.table(pd.DataFrame([{L['unit_name']: v['name'], L['location']: v['city'], L['last_seen']: v['last']} for v in global_devices.values()]))
+st.table(pd.DataFrame([
+    {
+        L['unit_name']: v['name'], 
+        L['location']: v['country'], 
+        L['last_seen']: v['last']
+    } for v in global_devices.values()
+]))
 
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {lang_pack["English"]["team_name"].upper()} &copy; 2026. ALL RIGHTS RESERVED.</div>', unsafe_allow_html=True)
-
-ct = time.time()
-for sid in list(global_devices.keys()):
-    if ct - global_devices[sid]["ts"] > 15: del global_devices[sid]
