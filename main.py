@@ -56,7 +56,7 @@ with st.sidebar:
 
     st.divider()
     st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-    st.sidebar.caption("Version 8.8.6-COUNTRY | KSR NOC")
+    st.sidebar.caption("Version 8.8.7-NOC | KSR NOC")
 
 
 # --- 3. Telemetry 數據處理 ---
@@ -64,15 +64,32 @@ headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 
-@st.cache_data(ttl=3600)
-def get_loc(ip_addr):
+# 核心修正：雙重 API 備援機制
+@st.cache_data(ttl=86400) # 國家資訊一天抓一次即可，增加穩定性
+def get_loc_advanced(ip_addr):
+    # 第一案：ip-api
     try:
-        # 加上 lang=en 確保取得國際通用國家名
-        r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=5).json()
-        return r if r['status'] == 'success' else None
-    except: return None
+        r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=3).json()
+        if r.get('status') == 'success':
+            return {"country": r.get('country'), "lat": r.get('lat'), "lon": r.get('lon')}
+    except: pass
 
-loc = get_loc(ip)
+    # 第二案：備援 ipapi.co
+    try:
+        r = requests.get(f"https://ipapi.co/{ip_addr}/json/", timeout=3).json()
+        if not r.get('error'):
+            return {"country": r.get('country_name'), "lat": r.get('latitude'), "lon": r.get('longitude')}
+    except: pass
+
+    return None
+
+loc_data = get_loc_advanced(ip)
+
+# 確定最終顯示的國家與座標（若抓不到則預設 Taiwan）
+display_country = loc_data.get('country', "Taiwan") if loc_data else "Taiwan"
+display_lat = loc_data.get('lat', 25.03) if loc_data else 25.03
+display_lon = loc_data.get('lon', 121.56) if loc_data else 121.56
+
 if "Windows" in user_agent:
     icon, dev_type = "💻", "Windows"
 elif "iPhone" in user_agent:
@@ -94,12 +111,12 @@ df_raw = pd.DataFrame(st.session_state.history)
 jitter = np.mean(np.abs(np.diff(df_raw['ms']))) if len(df_raw) > 1 else 0
 sla = (sum(1 for p in df_raw['ms'] if p < 60)/len(df_raw)*100)
 
-# 🔥 核心修改 1：全域清單只儲存國家
+# 更新全域清單
 global_devices[display_id] = {
     "name": display_id, 
-    "country": loc['country'] if loc else "Unknown", 
-    "lat": loc['lat'] if loc else 25.03, 
-    "lon": loc['lon'] if loc else 121.56,
+    "country": display_country, 
+    "lat": display_lat, 
+    "lon": display_lon,
     "last": current_now,
     "ts": time.time()
 }
@@ -112,10 +129,7 @@ for sid in list(global_devices.keys()):
 
 # --- 4. Dashboard 主介面渲染 ---
 st.title(f"📡 {L['title']}")
-
-# 🔥 核心修改 2：頂部標題資訊改為顯示國家
-current_country = loc['country'] if loc else 'Detecting...'
-st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{current_country}`")
+st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{display_country}`")
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(L['m1'], f"{len(global_devices)} Units")
@@ -147,11 +161,11 @@ with c_map:
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
 
-# 🔥 核心修改 3：表格欄位強制對應國家
+# 表格欄位強制對應國家
 st.table(pd.DataFrame([
     {
         L['unit_name']: v['name'], 
-        L['location']: v['country'], # 這裡絕對只會出現國家
+        L['location']: v['country'], 
         L['last_seen']: v['last']
     } for v in global_devices.values()
 ]))
