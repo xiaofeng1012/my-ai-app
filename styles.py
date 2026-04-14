@@ -4,19 +4,27 @@ import streamlit as st
 def apply_ksr_styles():
     st.markdown("""
         <style>
-            /* 1. 隱藏最礙眼的官方 Footer */
-            footer {visibility: hidden;} 
+            /* 1. 隱藏官方 footer */
+            footer {visibility: hidden !important;} 
 
-            /* 2. 隱藏右上角的三條線選單 (MainMenu) */
-            #MainMenu {visibility: hidden;}
-            
-            /* 3. 保留 Header，但讓它變透明，這樣左上角的按鈕就不會被蓋住 */
-            header[data-testid="stHeader"] {
-                background: transparent !important;
-                border: none !important;
+            /* 2. [手術刀方案] 只隱藏 header 的右半部內容 */
+            /* 針對 header 內部的右側工具欄區塊進行封殺 */
+            div[data-testid="stHeaderActionElements"],
+            .stAppDeployButton,
+            div[data-testid="stStatusWidget"] {
+                display: none !important;
             }
 
-            /* 4. 工業級大字體 Metrics 設定 - 這部分最穩定，一定要留著 */
+            /* 3. 強制確保左側側邊欄按鈕的可見度與樣式 */
+            button[data-testid="stSidebarCollapseButton"] {
+                color: #00f2ff !important;
+                background-color: rgba(0, 242, 255, 0.1) !important;
+                border: 1px solid rgba(0, 242, 255, 0.3) !important;
+                visibility: visible !important;
+                display: flex !important;
+            }
+
+            /* 4. 專業 Metrics 視覺設定 (保持一致) */
             [data-testid="stMetricValue"] { 
                 font-size: 52px !important; 
                 font-weight: 800 !important; 
@@ -25,8 +33,6 @@ def apply_ksr_styles():
             }
             [data-testid="stMetricLabel"] { 
                 font-size: 14px !important; 
-                letter-spacing: 1px !important; 
-                text-transform: uppercase !important; 
                 color: #A1AAB5 !important; 
             }
             [data-testid="stMetric"] { 
@@ -36,12 +42,9 @@ def apply_ksr_styles():
                 border-radius: 10px !important; 
             }
             
-            /* 調整主畫面間距 */
-            .block-container { padding-top: 2rem; }
-            
-            /* 頁尾版權標註 */
+            .block-container { padding-top: 3rem; }
             .ksr-footer {
-                text-align: center; color: #30363D; font-size: 11px; padding: 25px; letter-spacing: 1px;
+                text-align: center; color: #30363D; font-size: 11px; padding: 25px;
             }
         </style>
     """, unsafe_allow_html=True)
