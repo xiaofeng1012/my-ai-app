@@ -1,6 +1,5 @@
 # main.py
 import streamlit as st
-import pd as pd # 修正：建議使用標準 import pandas as pd
 import pandas as pd
 import requests
 import random
