@@ -29,7 +29,7 @@ tw_tz = timezone(timedelta(hours=8))
 # 套用客製化 CSS
 apply_ksr_styles()
 
-# 🔥 核心修改：設定每秒刷新 (1000ms)
+# 設定每秒刷新 (1000ms)
 st_autorefresh(interval=1000, key="data_refresh_1s")
 
 # 初始化 session state
@@ -56,7 +56,7 @@ with st.sidebar:
 
     st.divider()
     st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-    st.sidebar.caption("Version 8.8.5-REALTIME | KSR NOC")
+    st.sidebar.caption("Version 8.8.6-COUNTRY | KSR NOC")
 
 
 # --- 3. Telemetry 數據處理 ---
@@ -67,6 +67,7 @@ ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 @st.cache_data(ttl=3600)
 def get_loc(ip_addr):
     try:
+        # 加上 lang=en 確保取得國際通用國家名
         r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=5).json()
         return r if r['status'] == 'success' else None
     except: return None
@@ -93,7 +94,7 @@ df_raw = pd.DataFrame(st.session_state.history)
 jitter = np.mean(np.abs(np.diff(df_raw['ms']))) if len(df_raw) > 1 else 0
 sla = (sum(1 for p in df_raw['ms'] if p < 60)/len(df_raw)*100)
 
-# 更新全域節點清單
+# 🔥 核心修改 1：全域清單只儲存國家
 global_devices[display_id] = {
     "name": display_id, 
     "country": loc['country'] if loc else "Unknown", 
@@ -103,7 +104,7 @@ global_devices[display_id] = {
     "ts": time.time()
 }
 
-# 🔥 每秒清理邏輯：若裝置 8 秒內沒刷新就視為斷線
+# 每秒清理邏輯
 ct = time.time()
 for sid in list(global_devices.keys()):
     if ct - global_devices[sid]["ts"] > 8: 
@@ -111,9 +112,11 @@ for sid in list(global_devices.keys()):
 
 # --- 4. Dashboard 主介面渲染 ---
 st.title(f"📡 {L['title']}")
-st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{loc['country'] if loc else 'Detecting...'}`")
 
-# 這裡的 len(global_devices) 現在會每秒更新
+# 🔥 核心修改 2：頂部標題資訊改為顯示國家
+current_country = loc['country'] if loc else 'Detecting...'
+st.markdown(f"**{L['audit_hash']}:** `{sys_hash}` | **{L['node']}:** `{current_country}`")
+
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(L['m1'], f"{len(global_devices)} Units")
 m2.metric(L['m2'], f"{curr_p} ms", delta=f"{curr_p - df_raw['ms'].iloc[-2] if len(df_raw)>1 else 0} ms", delta_color="inverse")
@@ -143,10 +146,12 @@ with c_map:
 
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
+
+# 🔥 核心修改 3：表格欄位強制對應國家
 st.table(pd.DataFrame([
     {
         L['unit_name']: v['name'], 
-        L['location']: v['country'], 
+        L['location']: v['country'], # 這裡絕對只會出現國家
         L['last_seen']: v['last']
     } for v in global_devices.values()
 ]))
