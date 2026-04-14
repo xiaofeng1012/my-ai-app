@@ -1,7 +1,8 @@
 # components.py
-import streamlit as st
+import streamlit.components.v1 as components
 
 def render_speed_test_ui(L):
+    # 確保內嵌的 HTML 包含完整的標籤與樣式
     js_code = f"""
     <div style="background: #161B22; padding: 10px; border-radius: 10px; border: 1px solid #30363D; color: white; font-family: sans-serif;">
         <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117; margin-bottom: 10px;">
@@ -34,6 +35,5 @@ def render_speed_test_ui(L):
     }}
     </script>
     """
-    # 修正處：將 width='stretch' 改為使用 use_container_width=True (如果版本支援) 
-    # 或直接不填 width 以確保相容性
-    return st.components.v1.iframe(srcdoc=js_code, height=180)
+    # 使用 html 方法並開啟自動調整容器寬度
+    return components.html(js_code, height=160, scrolling=False)
