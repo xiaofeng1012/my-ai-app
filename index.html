@@ -5,8 +5,21 @@
     <script type="text/javascript">
         window.location.href = "https://my-ai-app-vweyvgkccwtkc4hgswuv9c"
     </script>
+    <style>
+        body, html {
+            margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #0d1117;
+        }
+        /* 向上推移 55 像素，剛好把 Streamlit 的頂部工具欄（包含帳號、Deploy）推出去 */
+        iframe {
+            width: 100%;
+            height: calc(100% + 55px); 
+            margin-top: -55px;
+            border: none;
+        }
+    </style>
 </head>
 <body>
-    正在進入卡式如通訊監測平台...
+    <iframe src="https://my-ai-app-vweyvgkccwtkc4hgswuv9c"></iframe>
 </body>
 </html>
+
