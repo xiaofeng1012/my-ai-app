@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡式如通訊品質監測平台</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #0d1117;
+        }
+        /* 核心關鍵：利用負的 margin 把 Streamlit 的頭部推上去 */
+        iframe {
+            width: 100%;
+            height: calc(100% + 55px); /* 多出來的高度補足推上去的部分 */
+            margin-top: -55px;         /* 向上推移，蓋掉開發者欄位 */
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <iframe src="https://xiaofeng1012-my-ai-app-main.streamlit.app/?embed=true"></iframe>
+</body>
+</html>
