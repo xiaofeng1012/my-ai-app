@@ -1,14 +1,17 @@
 # components.py
-import streamlit.components.v1 as components
+import streamlit as st
 
 def render_speed_test_ui(L):
     js_code = f"""
-    <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117;">
-        {L['speed_wait']}
+    <div style="background: #161B22; padding: 10px; border-radius: 10px; border: 1px solid #30363D; color: white; font-family: sans-serif;">
+        <div id="speed-result" style="color: #00f2ff; font-family: monospace; font-size: 18px; font-weight: bold; text-align: center; padding: 12px; border: 1px solid #30363D; border-radius: 8px; background: #0d1117; margin-bottom: 10px;">
+            {L['speed_wait']}
+        </div>
+        <button onclick="runSpeedTest()" style="width: 100%; padding: 12px; background: #00f2ff; color: black; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; display: block;">
+            {L['speed_btn']}
+        </button>
     </div>
-    <button onclick="runSpeedTest()" style="width: 100%; margin-top: 8px; padding: 10px; background: #00f2ff; color: black; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
-        {L['speed_btn']}
-    </button>
+
     <script>
     async function runSpeedTest() {{
         const display = document.getElementById('speed-result');
@@ -25,8 +28,11 @@ def render_speed_test_ui(L):
             }}
             const duration = (new Date().getTime() - startTime) / 1000;
             display.innerText = ((received * 8) / duration / 1000000).toFixed(2) + " Mbps";
-        }} catch (e) {{ display.innerText = "ERROR"; }}
+        }} catch (e) {{ 
+            display.innerText = "ERROR"; 
+        }}
     }}
     </script>
     """
-    return components.html(js_code, height=140)
+    # 根據 2026 新規範，使用 st.iframe 並設定 width='stretch'
+    return st.iframe(srcdoc=js_code, height=180, width='stretch')
