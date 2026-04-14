@@ -1,5 +1,6 @@
 # main.py
 import streamlit as st
+import pd as pd # 修正：建議使用標準 import pandas as pd
 import pandas as pd
 import requests
 import random
@@ -29,20 +30,24 @@ tw_tz = timezone(timedelta(hours=8))
 # 套用客製化 CSS
 apply_ksr_styles()
 
-# 設定每秒刷新 (1000ms)，這會驅動時鐘跳動
+# 設定每秒刷新 (1000ms)，確保側邊欄時鐘與離線判定精確
 st_autorefresh(interval=1000, key="data_refresh_1s")
 
 # 初始化 session state
 if 'history' not in st.session_state: 
     st.session_state.history = [{"time": datetime.now(tw_tz).strftime("%H:%M:%S"), "ms": 30}]
 
+# 初始化本次連線進入時間
+if 'session_start_time' not in st.session_state:
+    st.session_state.session_start_time = datetime.now(tw_tz).strftime("%H:%M:%S")
+
 @st.cache_resource
 def get_global_data(): return {} 
 global_devices = get_global_data()
 
-# --- 2. 側邊欄控制中心 (新增即時時鐘) ---
+# --- 2. 側邊欄控制中心 (內建即時時鐘) ---
 with st.sidebar:
-    # 🔥 核心修改：在最上方顯示精緻的數位時鐘
+    # 數位時鐘：提供系統運作的動態視覺感
     st.markdown(f"""
         <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; border-left: 5px solid #00f2ff; margin-bottom: 20px;">
             <p style="margin:0; color: #8b949e; font-size: 0.75rem; letter-spacing: 1px;">SYSTEM REAL-TIME (UTC+8)</p>
@@ -66,7 +71,7 @@ with st.sidebar:
 
     st.divider()
     st.sidebar.markdown(f"**Designed by {L['team_name']}**")
-    st.sidebar.caption("Version 8.8.8-TRACKER | KSR NOC")
+    st.sidebar.caption("Version 8.9.0-FINAL | KSR NOC")
 
 
 # --- 3. Telemetry 數據處理 ---
@@ -74,7 +79,7 @@ headers = st.context.headers
 user_agent = headers.get("User-Agent", "Unknown")
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=86400) # 國家位置一天抓一次，提升效能並避免被 API 封鎖
 def get_loc_advanced(ip_addr):
     try:
         r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=3).json()
@@ -99,32 +104,46 @@ display_id = f"{dev_type}_{hashlib.md5(f'{dev_type}_{ip}'.encode()).hexdigest()[
 sys_hash = hashlib.sha1(display_id.encode()).hexdigest()[:12].upper()
 
 # 獲取校準後的台北時間
-current_now = datetime.now(tw_tz).strftime("%H:%M:%S")
+current_now_str = datetime.now(tw_tz).strftime("%H:%M:%S")
 
+# 模擬延遲數據
 curr_p = random.randint(22, 55)
-st.session_state.history.append({"time": current_now, "ms": curr_p})
+st.session_state.history.append({"time": current_now_str, "ms": curr_p})
 if len(st.session_state.history) > 40: st.session_state.history.pop(0)
 
 df_raw = pd.DataFrame(st.session_state.history)
 jitter = np.mean(np.abs(np.diff(df_raw['ms']))) if len(df_raw) > 1 else 0
 sla = (sum(1 for p in df_raw['ms'] if p < 60)/len(df_raw)*100)
 
-# 更新全域清單：紀錄裝置最後活動的當下
-global_devices[display_id] = {
-    "name": display_id, 
-    "country": display_country, 
-    "lat": display_lat, 
-    "lon": display_lon,
-    "last": current_now, # 紀錄該裝置「最後一次更新」的時間
-    "ts": time.time()
-}
+# 🔥 核心狀態機邏輯：離線定格紀錄
+if display_id not in global_devices:
+    # 首次進入，紀錄起始時間
+    global_devices[display_id] = {
+        "name": display_id, 
+        "country": display_country, 
+        "last": current_now_str, 
+        "ts": time.time(),
+        "status": "Online 🟢"
+    }
+else:
+    # 在線中，僅更新背景心跳戳記 (ts)，不更新顯示字串 (last)
+    global_devices[display_id]["ts"] = time.time()
+    global_devices[display_id]["status"] = "Online 🟢"
 
-# 🔥 核心修改：延長清理判定
-# 當使用者關閉網站，global_devices 會保留他的 last_seen 時間，並在清單中存留 60 秒
+# 離線判定邏輯
 ct = time.time()
 for sid in list(global_devices.keys()):
-    if ct - global_devices[sid]["ts"] > 60: 
-        del global_devices[sid]
+    time_diff = ct - global_devices[sid]["ts"]
+    
+    # 若超過 10 秒沒心跳，標記離線並捕捉離開時間
+    if time_diff > 10:
+        if global_devices[sid]["status"] == "Online 🟢":
+            global_devices[sid]["last"] = datetime.now(tw_tz).strftime("%H:%M:%S")
+            global_devices[sid]["status"] = "Offline 🔴"
+        
+        # 斷線超過 60 秒後徹底移除
+        if time_diff > 60:
+            del global_devices[sid]
 
 # --- 4. Dashboard 主介面渲染 ---
 st.title(f"📡 {L['title']}")
@@ -160,13 +179,16 @@ with c_map:
 st.divider()
 st.subheader(f"📋 {L['list_title']}")
 
-# 這裡顯示的會是裝置「最後在線」的時間
-st.table(pd.DataFrame([
-    {
+# 渲染智慧列表：在線時時間靜止，離線時顯示最後活動
+list_df = []
+for v in global_devices.values():
+    list_df.append({
         L['unit_name']: v['name'], 
         L['location']: v['country'], 
-        L['last_seen']: v['last']
-    } for v in global_devices.values()
-]))
+        "Status": v['status'],
+        L['last_seen']: v['last'] 
+    })
+
+st.table(pd.DataFrame(list_df))
 
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {lang_pack["English"]["team_name"].upper()} &copy; 2026. ALL RIGHTS RESERVED.</div>', unsafe_allow_html=True)
