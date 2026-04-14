@@ -34,5 +34,6 @@ def render_speed_test_ui(L):
     }}
     </script>
     """
-    # 根據 2026 新規範，使用 st.iframe 並設定 width='stretch'
-    return st.iframe(srcdoc=js_code, height=180, width='stretch')
+    # 修正處：將 width='stretch' 改為使用 use_container_width=True (如果版本支援) 
+    # 或直接不填 width 以確保相容性
+    return st.components.v1.iframe(srcdoc=js_code, height=180)
