@@ -130,8 +130,8 @@ with c_diag:
     fig = px.area(df_raw, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
     fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=0))
     
-    # 符合 2026 規範：使用 width='stretch'
-    st.plotly_chart(fig, width='stretch')
+    # 修正處：將 width='stretch' 改回 use_container_width=True
+    st.plotly_chart(fig, use_container_width=True)
     
     # 導出 CSV 報告 (內含英文團隊名標註)
     csv_data = generate_csv_report(df_raw, sys_hash, display_id, lang_pack['English']['team_name'])
