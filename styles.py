@@ -6,8 +6,6 @@ def apply_ksr_styles():
         <style>
             /* 1. 隱藏官方 footer 與選單，但保留核心佈局 */
             #MainMenu {visibility: hidden;} 
-            footer {visibility: hidden;} 
-            div[data-testid="stToolbar"] {visibility: hidden;}
 
             /* 2. 關鍵修正：修復側邊欄按鈕消失的問題 */
             /* 我們不隱藏 header，而是讓它變透明，這樣開啟按鈕才抓得到 */
