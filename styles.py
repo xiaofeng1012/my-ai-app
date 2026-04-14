@@ -4,29 +4,60 @@ import streamlit as st
 def apply_ksr_styles():
     st.markdown("""
         <style>
-            /* 1. 隱藏底部 Made with Streamlit */
-            footer {visibility: hidden;} 
+            /* =========================================
+               🚀 [重磅修正] 徹底封殺右上角所有 Streamlit 元素
+               ========================================= */
 
-            /* 2. 精準隱藏右上角選單 (三條線) 與帳號資訊 */
-            /* 我們不再針對整個 header，而是針對右側的容器 */
-            div[data-testid="stStatusWidget"] {display: none;}
-            #MainMenu {visibility: hidden;}
-            
-            /* 針對右上角所有的按鈕組件（包含 Deploy 和帳號選單）進行封殺 */
-            .stAppDeployButton {display: none !important;}
-            [data-testid="stAppViewBlockContainer"] header { background: transparent; }
-            
-            /* 3. 強制保留並美化左上角的控制中心開關 (Sidebar Toggle) */
-            /* 確保左邊的按鈕是可見且具備「卡式如」品牌色的 */
-            button[data-testid="stSidebarCollapseButton"] {
-                color: #00f2ff !important;
-                background-color: rgba(0, 242, 255, 0.1) !important;
-                border: 1px solid rgba(0, 242, 255, 0.3) !important;
-                visibility: visible !important; /* 強制可見 */
-                display: flex !important;
+            /* 1. 隱藏底部 footer */
+            footer {visibility: hidden !important; display: none !important;} 
+
+            /* 2. [地毯式轟炸] 針對右上角所有工具欄、帳號、選單容器 */
+            /* 這些是 2026 年常見的 Streamlit 右上角容器選擇器 */
+            div[data-testid="stStatusWidget"],
+            .stAppDeployButton,
+            header[data-testid="stHeader"] > div:nth-child(2), /* 右側容器 */
+            div[class^="st-emotion-cache"] > button[id^="text_input_"], /* 某些帳號按鈕 */
+            #MainMenu,
+            div[data-testid="stToolbar"] {
+                visibility: hidden !important;
+                display: none !important;
+                opacity: 0 !important;
+                pointer-events: none !important; /* 確保點不到 */
+                width: 0 !important;
+                height: 0 !important;
             }
 
-            /* 4. 工業級大字體 Metrics 設定 */
+            /* 3. [死守] 強制保留並美化左上角控制中心開關 (Sidebar Toggle) */
+            /* 這是我們唯一的活口，必須用最高優先權(!)保護 */
+            header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
+                color: #00f2ff !important;
+                background-color: rgba(0, 242, 255, 0.15) !important;
+                border: 1px solid rgba(0, 242, 255, 0.4) !important;
+                visibility: visible !important; /* 強制可見 */
+                display: flex !important; /* 強制顯示 */
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                position: absolute !important;
+                left: 10px !important;
+                top: 10px !important;
+                z-index: 999999 !important; /* 確保在最上層 */
+            }
+            
+            /* 讓透明的 Header 不要擋到主畫面 */
+            header[data-testid="stHeader"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                border: none !important;
+                pointer-events: none !important; /* 讓 Header 本身不擋點擊 */
+            }
+            /* 但要讓 Header 內的按鈕可以點擊 */
+            header[data-testid="stHeader"] * {
+                pointer-events: auto;
+            }
+
+            /* =========================================
+               🎨 工業級大字體 Metrics 設定 (保持不變)
+               ========================================= */
             [data-testid="stMetricValue"] { 
                 font-size: 52px !important; 
                 font-weight: 800 !important; 
