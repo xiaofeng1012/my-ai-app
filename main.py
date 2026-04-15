@@ -21,15 +21,15 @@ init_db()
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 
-# 🔄 調整為 2000ms (2秒) 刷新一次，兼顧即時性與視覺穩定
-st_autorefresh(interval=2000, key="ksr_refresh_stable")
+# 🔄 2秒刷新，兼顧即時性與防止捲軸跳動
+st_autorefresh(interval=2000, key="ksr_refresh_final_admin")
 
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
 if 'auth_status' not in st.session_state: st.session_state.auth_status = None
 if 'username' not in st.session_state: st.session_state.username = "Guest"
 if 'chart_data' not in st.session_state: st.session_state.chart_data = pd.DataFrame(columns=["time", "ms"])
 
-# --- 3. 側邊欄：帳號與功能 ---
+# --- 3. 側邊欄控制 ---
 with st.sidebar:
     st.markdown(f"""
         <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; border-left: 5px solid #00f2ff; margin-bottom: 20px;">
@@ -40,8 +40,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-    st.session_state.lang = st.selectbox("🌐 Language", ["繁體中文", "English"], 
-                                       index=0 if st.session_state.lang == "繁體中文" else 1)
+    st.session_state.lang = st.selectbox("🌐 Language", ["繁體中文", "English"], index=0 if st.session_state.lang=="繁體中文" else 1)
     L = lang_pack[st.session_state.lang]
     st.divider()
 
@@ -63,7 +62,7 @@ with st.sidebar:
                 if register_user(ru, rp): st.success(L['reg_success'])
                 else: st.error(L['err_exists'])
     else:
-        st.success(f"👤 {L['auth_welcome']}, {st.session_state.username}")
+        st.success(f"👤 {L['auth_welcome']}, {st.session_state.username} ({st.session_state.auth_status})")
         if st.button(L['auth_logout'], use_container_width=True):
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
@@ -80,58 +79,64 @@ with st.sidebar:
                     st.session_state.last_ts = ts_val
                     add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
                     st.toast(f"✅ Record Logged: {mbps_val} Mbps")
-                    time.sleep(0.5)
-                    st.rerun()
+                    time.sleep(0.5); st.rerun()
             except: pass
 
-# --- 4. Dashboard 數據運算 ---
+# --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-25:]
 
-user_logs = get_records(st.session_state.username)
-if not user_logs.empty:
-    sla_val = f"{(len(user_logs[user_logs['狀態'].str.contains('Pass|Success', na=False)]) / len(user_logs)) * 100:.1f}%"
-else:
-    sla_val = "100%"
+# 在線節點模擬與數據獲取
+global_devices = st.cache_resource(lambda: {})()
+if st.session_state.auth_status:
+    global_devices[st.session_state.username] = {"name": st.session_state.username, "ip": "127.0.0.1", "ts": time.time(), "status": "Online 🟢"}
 
-# --- 5. Dashboard UI 渲染 (防置頂優化佈局) ---
+# --- 5. Dashboard UI 渲染 ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
-m1.metric(L['m1'], f"{len(st.cache_resource(lambda: {})())}")
+
+# 獲取紀錄計算 SLA
+user_logs = get_records(st.session_state.username)
+sla_val = f"{(len(user_logs[user_logs['狀態'].str.contains('Pass|Success', na=False)]) / len(user_logs)) * 100:.1f}%" if not user_logs.empty else "100%"
+
+m1.metric(L['m1'], f"{len(global_devices)}")
 m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
 m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
 m4.metric(L['m4'], sla_val)
 
-# 📊 圖表區：縮小高度，避免頁面捲動導致置頂問題
-st.markdown(f"##### 📊 {L['diag_title']}")
+st.divider()
+
+# 📊 圖表區 (縮減高度防止置頂問題)
 fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
-fig.update_layout(
-    height=240, # 🔥 縮小高度至 240
-    margin=dict(l=0, r=0, t=5, b=5),
-    xaxis_showgrid=False,
-    transition_duration=400,
-    yaxis=dict(range=[0, 100], fixedrange=True, title=None),
-    xaxis=dict(fixedrange=True, title=None)
-)
+fig.update_layout(height=220, margin=dict(l=0, r=0, t=5, b=5), xaxis_showgrid=False, transition_duration=400, yaxis=dict(range=[0, 100], fixedrange=True, title=None))
 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-# --- 6. 數據清單：改為並排，減少垂直長度 ---
-col_l, col_r = st.columns([1.1, 0.9])
+# --- 6. 權限分級內容渲染 (重點修復) ---
+st.divider()
 
-with col_l:
-    st.markdown(f"##### 📜 {L['user_record']}")
+if st.session_state.auth_status == "admin":
+    # 👑 Admin 模式：Tab 分頁顯示全系統資訊
+    st.subheader("🛠️ Admin Control Panel")
+    t_nodes, t_logs = st.tabs(["🌐 Active Nodes", "📜 All System Logs"])
+    with t_nodes:
+        st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True, height=250, hide_index=True)
+    with t_logs:
+        full_logs = get_records() # Admin 讀取全部
+        st.dataframe(full_logs, use_container_width=True, height=250, hide_index=True)
+        if st.button("⚠️ Clear All Database Records", type="primary"):
+            clear_all_records(); st.rerun()
+
+elif st.session_state.auth_status == "user":
+    # 👤 一般用戶：僅顯示個人紀錄
+    st.subheader(f"📜 {L['user_record']}")
     if not user_logs.empty:
-        # 設定固定高度，強制內部捲動，防止全網頁捲動
-        st.dataframe(user_logs, use_container_width=True, height=250, hide_index=True)
+        st.dataframe(user_logs, use_container_width=True, height=300, hide_index=True)
     else:
-        st.caption("No records yet.")
+        st.info("💡 目前無紀錄，請啟動測速。")
 
-with col_r:
-    st.markdown(f"##### 🌐 System Status")
-    # 這裡顯示簡易系統資訊卡，增加飽滿感
-    st.info(f"🟢 User: {st.session_state.username}\n\n📍 IP: {st.context.headers.get('X-Forwarded-For', '127.0.0.1').split(',')[0]}")
-    st.caption("Auto-refreshing every 2 seconds...")
+else:
+    st.warning(L['lock_msg'])
 
-# 底部 Footer
+# Footer
 st.markdown(f'<div class="ksr-footer">{L["version_info"]} | {L["team_name"]} &copy; 2026.</div>', unsafe_allow_html=True)
