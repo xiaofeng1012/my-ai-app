@@ -13,11 +13,11 @@ from streamlit_autorefresh import st_autorefresh
 # 匯入自定義與資料庫模組
 from language_pack import lang_pack
 from styles import apply_ksr_styles
-from database import init_db, register_user, login_user
+from database import init_db, register_user, login_user, add_record, get_records, clear_all_records
 
 # --- 1. 初始化 ---
 st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
-init_db() 
+init_db() # 啟動 SQLite 並建立表
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 st_autorefresh(interval=1000, key="data_refresh_1s")
@@ -27,7 +27,7 @@ if 'auth_status' not in st.session_state: st.session_state.auth_status = None
 if 'username' not in st.session_state: st.session_state.username = "Guest"
 if 'chart_data' not in st.session_state: st.session_state.chart_data = pd.DataFrame(columns=["time", "ms"])
 
-# --- 2. 側邊欄：登入與語系 ---
+# --- 2. 側邊欄：登入與控制 ---
 with st.sidebar:
     st.markdown(f"""
         <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; border-left: 5px solid #00f2ff; margin-bottom: 20px;">
@@ -92,16 +92,12 @@ display_country = loc.get('country', "Taiwan")
 user_id = st.session_state.username
 global_devices = st.cache_resource(lambda: {})()
 
-# 🔥 核心修正：初次登入與心跳紀錄 (加入 IP 與 Start Time)
+# 心跳紀錄 (用於管理員查看即時在線)
 if st.session_state.auth_status:
     if user_id not in global_devices:
         global_devices[user_id] = {
-            "name": user_id,
-            "ip": ip,
-            "location": display_country, 
-            "start_time": current_now_str, # 紀錄登入那一刻
-            "last": current_now_str,
-            "ts": time.time(),
+            "name": user_id, "ip": ip, "location": display_country, 
+            "start_time": current_now_str, "last": current_now_str, "ts": time.time(),
             "status": "Online 🟢" if st.session_state.lang == "繁體中文" else "Online 🟢"
         }
     else:
@@ -120,6 +116,8 @@ for sid in list(global_devices.keys()):
 # --- 4. Dashboard 主介面 ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
+
+# 圖表數據更新
 new_tick = pd.DataFrame([{"time": current_now_str, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
@@ -134,55 +132,50 @@ fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_da
 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 分級清單渲染 (Admin 專屬控制台) ---
+# --- 5. 分級渲染核心 (User: 歷史紀錄 | Admin: DataBase 全資料) ---
 st.divider()
+
 if st.session_state.auth_status == "admin":
-    st.subheader(f"📋 {L['db_title']}")
+    # 🏆 管理員專屬：雙分頁監控中心
+    tab_active, tab_history = st.tabs(["Active Nodes", "Full Database Logs"])
     
-    # 🔥 管理員專屬：全維度數據中心 (ID, IP, 地理位置, 使用時間, 最後活動)
-    col_ip_title = "IP Address" if st.session_state.lang == "English" else "網路位址 (IP)"
-    col_start_title = "Session Start" if st.session_state.lang == "English" else "登入使用時間"
-    
-    admin_data = []
-    for v in global_devices.values():
-        admin_data.append({
-            L['unit_name']: v['name'],
-            col_ip_title: v['ip'],
-            L['location']: v['location'],
-            col_start_title: v['start_time'],
-            L['last_seen']: v['last'],
-            "Status": v['status']
-        })
-    
-    # 使用互動式 dataframe 替代簡單表格
-    df_admin = pd.DataFrame(admin_data)
-    if not df_admin.empty:
-        st.dataframe(
-            df_admin, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "Status": st.column_config.TextColumn("Status", width="small"),
-                col_ip_title: st.column_config.TextColumn(col_ip_title, width="medium")
-            }
-        )
-    else:
-        st.info("Currently no active users in database.")
-    
-    from utils import generate_csv_report
-    st.download_button(L['export_btn'], generate_csv_report(st.session_state.chart_data, "ADMIN", "ROOT", "KSR"), "ksr_admin_audit.csv")
+    with tab_active:
+        st.subheader(f"📋 {L['db_title']}")
+        col_ip_title = "IP Address" if st.session_state.lang == "English" else "網路位址 (IP)"
+        col_start_title = "Session Start" if st.session_state.lang == "English" else "登入使用時間"
+        admin_active = [{L['unit_name']: v['name'], col_ip_title: v['ip'], L['location']: v['location'], 
+                         col_start_title: v['start_time'], L['last_seen']: v['last'], "Status": v['status']} 
+                        for v in global_devices.values()]
+        st.dataframe(pd.DataFrame(admin_active), use_container_width=True, hide_index=True)
+
+    with tab_history:
+        st.subheader("🗄️ 全系統歷史測速數據庫")
+        all_logs = get_records() # Admin 抓全部
+        st.dataframe(all_logs, use_container_width=True, hide_index=True)
+        
+        # 管理員清理權限
+        if st.button("⚠️ 清空資料庫所有測速紀錄", type="primary"):
+            clear_all_records()
+            st.success("Database Cleared!")
+            st.rerun()
 
 elif st.session_state.auth_status == "user":
-    st.subheader(f"📋 {L['user_record']}: {user_id}")
-    if user_id in global_devices:
-        v = global_devices[user_id]
-        user_list = [{
-            L['unit_name']: v['name'],
-            L['location']: v['location'],
-            "Status": v['status'],
-            L['last_seen']: v['last']
-        }]
-        st.table(pd.DataFrame(user_list))
+    # 👤 一般使用者：個人測速歷史紀錄 (永久儲存)
+    history_title = "📜 個人測速歷史紀錄" if st.session_state.lang == "繁體中文" else "📜 Personal Test History"
+    st.subheader(history_title)
+    
+    my_logs = get_records(st.session_state.username)
+    if not my_logs.empty:
+        st.dataframe(my_logs, use_container_width=True, hide_index=True)
+        st.download_button("📥 " + L['export_btn'], my_logs.to_csv(index=False).encode('utf-8'), f"history_{user_id}.csv")
+    else:
+        st.info("尚無數據。請點擊測速指令。")
+
+    # 模擬測速並存入 DB (測試用)
+    if st.button("模擬測速並寫入資料庫"):
+        add_record(st.session_state.username, random.randint(20, 50), random.randint(1, 5), "Pass ✅")
+        st.rerun()
+
 else:
     st.warning(L['lock_msg'])
 
