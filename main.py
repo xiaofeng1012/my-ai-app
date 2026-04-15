@@ -1,4 +1,3 @@
-# main.py
 import streamlit as st
 import pandas as pd
 import requests
@@ -67,7 +66,7 @@ with st.sidebar:
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
-    # 🔥 測速邏輯
+    # 🔥 關鍵修正：測速邏輯與 JSON 解析
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
@@ -75,18 +74,20 @@ with st.sidebar:
         
         if speed_json:
             try:
-                # 解析前端傳回的 JSON
-                data = json.loads(speed_json)
-                mbps_val, ts_val = data['mbps'], data['ts']
+                # 解析前端傳回的包裹
+                res_data = json.loads(speed_json)
+                mbps_val = res_data['mbps']
+                ts_val = res_data['ts']
                 
-                # 只有當 timestamp 不同時才存入資料庫，避免 st_autorefresh 導致重複寫入
+                # 只有當 timestamp 真正更新時才執行存檔 (避免 autorefresh 重複存)
                 if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
                     st.session_state.last_ts = ts_val
-                    add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                    st.toast(f"✅ Record Saved: {mbps_val} Mbps")
+                    # 🔹 執行入庫
+                    add_record(st.session_state.username, float(mbps_val), 0.0, "Success ✅")
+                    st.toast(f"✅ Record Logged: {mbps_val} Mbps")
                     time.sleep(0.5)
                     st.rerun()
-            except: 
+            except Exception as e:
                 pass
 
 # --- 4. Dashboard 數據展示 ---
@@ -123,17 +124,21 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 if st.session_state.auth_status == "admin":
     t1, t2 = st.tabs(["Active Nodes", "System Logs"])
-    with t1: st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True)
+    with t1: st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True, hide_index=True)
     with t2:
         logs = get_records()
         st.dataframe(logs, use_container_width=True, hide_index=True)
-        if st.button("⚠️ Clear Records"):
+        if st.button("⚠️ Clear All Records"):
             clear_all_records()
             st.rerun()
 elif st.session_state.auth_status == "user":
     st.subheader(f"📜 {L['user_record']}")
     my_logs = get_records(st.session_state.username)
-    st.dataframe(my_logs, use_container_width=True, hide_index=True)
+    if not my_logs.empty:
+        st.dataframe(my_logs, use_container_width=True, hide_index=True)
+        st.download_button("📥 Export CSV", my_logs.to_csv(index=False).encode('utf-8'), f"logs_{st.session_state.username}.csv")
+    else:
+        st.info("💡 目前無紀錄，請點擊左側測速按鈕。")
 else:
     st.warning(L['lock_msg'])
 
