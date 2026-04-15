@@ -75,17 +75,19 @@ with st.sidebar:
         
         if speed_json:
             try:
+                # 解析前端傳回的 JSON
                 data = json.loads(speed_json)
                 mbps_val, ts_val = data['mbps'], data['ts']
                 
-                # 只有當 timestamp 更新時才寫入，防止刷新循環
+                # 只有當 timestamp 不同時才存入資料庫，避免 st_autorefresh 導致重複寫入
                 if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
                     st.session_state.last_ts = ts_val
                     add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
                     st.toast(f"✅ Record Saved: {mbps_val} Mbps")
                     time.sleep(0.5)
                     st.rerun()
-            except: pass
+            except: 
+                pass
 
 # --- 4. Dashboard 數據展示 ---
 headers = st.context.headers
@@ -98,7 +100,7 @@ if st.session_state.auth_status:
         "name": st.session_state.username, "ip": ip, "ts": time.time(), "status": "Online 🟢"
     }
 
-# 清理過期節點
+# 清理離線節點
 for sid in list(global_devices.keys()):
     if time.time() - global_devices[sid]["ts"] > 60: del global_devices[sid]
 
