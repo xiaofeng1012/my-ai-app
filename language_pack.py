@@ -22,7 +22,24 @@ lang_pack = {
         "speed_btn": "開始測速",
         "speed_wait": "等待指令...",
         "speed_testing": "測試中...",
-        "modes": ["一般辦公", "即時競技", "遠距會議", "影音串流"]
+        "modes": ["一般辦公", "即時競技", "遠距會議", "影音串流"],
+        # 新增登入系統欄位
+        "login_section": "帳號存取系統",
+        "tab_login": "登入",
+        "tab_register": "註冊",
+        "user_label": "帳號",
+        "pass_label": "密碼",
+        "btn_signin": "立即登入",
+        "btn_signup": "建立帳號",
+        "auth_welcome": "歡迎回來",
+        "auth_role": "權限等級",
+        "auth_logout": "登出系統",
+        "db_title": "DataBase: 全系統即時狀態",
+        "user_record": "個人監測紀錄",
+        "lock_msg": "🔒 請登入以啟動網路監測與數據儲存。",
+        "err_auth": "帳號或密碼錯誤",
+        "err_exists": "帳號已存在",
+        "reg_success": "註冊成功，請登入"
     },
     "English": {
         "title": "KSR Network Telemetry Platform",
@@ -46,6 +63,23 @@ lang_pack = {
         "speed_btn": "RUN SPEED TEST",
         "speed_wait": "STANDBY",
         "speed_testing": "TESTING...",
-        "modes": ["Standard", "Gaming", "VoIP", "Streaming"]
+        "modes": ["Standard", "Gaming", "VoIP", "Streaming"],
+        # New Login fields
+        "login_section": "Account Access System",
+        "tab_login": "Login",
+        "tab_register": "Register",
+        "user_label": "Username",
+        "pass_label": "Password",
+        "btn_signin": "Sign In",
+        "btn_signup": "Sign Up",
+        "auth_welcome": "Welcome back",
+        "auth_role": "Role",
+        "auth_logout": "Logout",
+        "db_title": "DataBase: Global Real-time Status",
+        "user_record": "Personal Monitoring Record",
+        "lock_msg": "🔒 Please login to enable telemetry and data logging.",
+        "err_auth": "Invalid username or password",
+        "err_exists": "Username already exists",
+        "reg_success": "Registration successful!"
     }
 }
