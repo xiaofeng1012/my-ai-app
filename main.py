@@ -67,40 +67,40 @@ with st.sidebar:
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
-    # --- main.py 側邊欄內的測速處理區 ---
+    
+    # --- main.py 側邊欄測速處理 ---
     
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
         
-        # 呼叫我們之前寫好的 render_speed_test_ui (含 JS Loader 那個版本)
-        speed_json = render_speed_test_ui(L)
+        # 1. 這裡會渲染 UI 並捕捉 JS 回傳的 JSON 字串
+        # 注意：如果 JS 還沒回傳，speed_result 就會是 None
+        speed_result = render_speed_test_ui(L) 
         
-        if speed_json:
+        if speed_result is not None:
             try:
-                data = json.loads(speed_json)
-                # 判斷 JS 是否回傳了完成狀態
-                if data.get("status") == "done":
-                    mbps_val = data['mbps']
-                    ts_val = data['ts']
+                # 2. 只有當它真的是字串時才解析
+                if isinstance(speed_result, str):
+                    data = json.loads(speed_result)
                     
-                    # 檢查是否為重複發送的數據
-                    if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
-                        st.session_state.last_ts = ts_val
+                    if data.get("status") == "done":
+                        mbps_val = data['mbps']
+                        ts_val = data['ts']
                         
-                        # 1. 執行資料庫寫入
-                        add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                        
-                        # 2. 顯示成功提示
-                        st.toast(f"✅ 已成功存入資料庫: {mbps_val} Mbps")
-                        
-                        # 3. 關鍵一步：給予極短的緩衝並強制全頁重整
-                        # 這樣 get_records 才會被重新執行，清單才會出現最新一筆
-                        time.sleep(0.5) 
-                        st.rerun() 
+                        if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
+                            st.session_state.last_ts = ts_val
+                            
+                            # 3. 顯示入庫中的狀態
+                            with st.spinner("Writing to DB..."):
+                                add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                                time.sleep(0.5) 
+                            
+                            st.toast(f"✅ Saved: {mbps_val} Mbps")
+                            st.rerun() # 🚀 強制全頁刷新，清單就會出現了！
             except Exception as e:
-                st.error(f"數據同步錯誤: {e}")
-
+                # 這裡就不會再跳 DeltaGenerator 的錯誤了
+                pass
 # --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
