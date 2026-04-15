@@ -152,4 +152,11 @@ elif st.session_state.auth_status == "user":
 else:
     st.warning(L['lock_msg'])
 
-st.markdown(f'<div class="ksr-footer">DEVELOPED BY {L["team_name"]} &copy; 2026.</div>', unsafe_allow_html=True)
+st.markdown(
+    f"""
+    <div class="ksr-footer">
+        {L['version_info']} | DEVELOPED BY {L['team_name']} &copy; 2026.
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
