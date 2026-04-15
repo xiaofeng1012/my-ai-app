@@ -39,7 +39,9 @@ lang_pack = {
         "lock_msg": "🔒 請登入以啟動網路監測與數據儲存。",
         "err_auth": "帳號或密碼錯誤",
         "err_exists": "帳號已存在",
-        "reg_success": "註冊成功，請登入"
+        "reg_success": "註冊成功，請登入",
+        "version_info": "開發版 V0.1",
+        "team_name": "卡式如通訊團隊",
     },
     "English": {
         "title": "KSR Network Telemetry Platform",
@@ -80,6 +82,8 @@ lang_pack = {
         "lock_msg": "🔒 Please login to enable telemetry and data logging.",
         "err_auth": "Invalid username or password",
         "err_exists": "Username already exists",
-        "reg_success": "Registration successful!"
+        "reg_success": "Registration successful!",
+        "version_info": "Development Build V0.1",
+        "team_name": "KSR Network Team"
     }
 }
