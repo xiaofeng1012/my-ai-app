@@ -10,12 +10,13 @@ import plotly.express as px
 from datetime import datetime, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
 
-# 匯入自定義與資料庫模組
+# --- 關鍵修正：將自定義模組匯入全部放在最頂層，避免 NameError ---
 from language_pack import lang_pack
 from styles import apply_ksr_styles
 from database import init_db, register_user, login_user, add_record, get_records, clear_all_records
+from components import render_speed_test_ui  
 
-# --- 1. 初始化 ---
+# --- 1. 系統初始化 ---
 st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
 init_db() 
 tw_tz = timezone(timedelta(hours=8))
@@ -72,9 +73,6 @@ with st.sidebar:
             st.session_state.username = "Guest"
             st.rerun()
 
-    # 🔥 關鍵修正：只有在登入狀態（auth_status 不為 None）時，才會顯示測速功能
-    # main.py 側邊欄區塊修正
-
     # 🔥 關鍵修正：登入後顯示測速並接收數據
     if st.session_state.auth_status:
         st.divider()
@@ -85,14 +83,14 @@ with st.sidebar:
         
         # 如果抓到新的測速值 (且不等於上一次存檔的值)
         if speed_val:
-            # 防止 autorefresh 導致同一筆數據每秒被存入資料庫一次
+            # 防止 autorefresh 導致同一筆數據每秒被重複存入資料庫
             if "last_saved_speed" not in st.session_state or st.session_state.last_saved_speed != speed_val:
                 st.session_state.last_saved_speed = speed_val
                 
-                # 寫入 SQLite (RTT 暫用 Mbps 代替)
+                # 將結果寫入 SQLite (RTT 欄位暫用測出的 Mbps 替代儲存)
                 add_record(st.session_state.username, float(speed_val), 0.0, "Success ✅")
                 
-                # 強制刷新，讓下方的紀錄表格立刻更新
+                # 強制刷新，讓下方的紀錄表格立刻顯示新數據
                 st.rerun()
 
 # --- 3. Telemetry 處理 ---
@@ -113,7 +111,7 @@ display_country = loc.get('country', "Taiwan")
 user_id = st.session_state.username
 global_devices = st.cache_resource(lambda: {})()
 
-# 心跳紀錄 (用於管理員查看即時在線)
+# 即時在線心跳紀錄 (Admin 視圖用)
 if st.session_state.auth_status:
     if user_id not in global_devices:
         global_devices[user_id] = {
@@ -138,6 +136,7 @@ for sid in list(global_devices.keys()):
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
 
+# 更新主圖表趨勢數據
 new_tick = pd.DataFrame([{"time": current_now_str, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
@@ -156,6 +155,7 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 
 if st.session_state.auth_status == "admin":
+    # 🏆 管理員控制台
     tab_active, tab_history = st.tabs(["Active Nodes", "Full Database Logs"])
     
     with tab_active:
@@ -178,6 +178,7 @@ if st.session_state.auth_status == "admin":
             st.rerun()
 
 elif st.session_state.auth_status == "user":
+    # 👤 一般使用者歷史紀錄
     st.subheader(f"📜 {L['user_record']}")
     my_logs = get_records(st.session_state.username)
     if not my_logs.empty:
@@ -187,7 +188,7 @@ elif st.session_state.auth_status == "user":
         st.info("💡 尚無數據。請使用側邊欄測速功能開始紀錄。" if st.session_state.lang == "繁體中文" else "No data. Please use the sidebar test function.")
 
 else:
-    # 訪客模式：隱藏清單並顯示鎖定提示
+    # 訪客模式
     st.warning(L['lock_msg'])
 
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {L["team_name"]} &copy; 2026.</div>', unsafe_allow_html=True)
