@@ -17,7 +17,7 @@ from database import init_db, register_user, login_user, add_record, get_records
 
 # --- 1. 初始化 ---
 st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide", page_icon="📡")
-init_db() # 啟動 SQLite 並建立表
+init_db() 
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 st_autorefresh(interval=1000, key="data_refresh_1s")
@@ -27,8 +27,9 @@ if 'auth_status' not in st.session_state: st.session_state.auth_status = None
 if 'username' not in st.session_state: st.session_state.username = "Guest"
 if 'chart_data' not in st.session_state: st.session_state.chart_data = pd.DataFrame(columns=["time", "ms"])
 
-# --- 2. 側邊欄：登入與控制 ---
+# --- 2. 側邊欄：帳號與功能控制 ---
 with st.sidebar:
+    # 數位時鐘
     st.markdown(f"""
         <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; border-left: 5px solid #00f2ff; margin-bottom: 20px;">
             <p style="margin:0; color: #8b949e; font-size: 0.75rem; letter-spacing: 1px;">SYSTEM REAL-TIME (UTC+8)</p>
@@ -43,6 +44,7 @@ with st.sidebar:
     L = lang_pack[st.session_state.lang]
     st.divider()
 
+    # 帳號存取區塊
     st.title(f"🔐 {L['login_section']}")
     if st.session_state.auth_status is None:
         tab1, tab2 = st.tabs([L['tab_login'], L['tab_register']])
@@ -70,9 +72,12 @@ with st.sidebar:
             st.session_state.username = "Guest"
             st.rerun()
 
-    st.divider()
-    from components import render_speed_test_ui
-    render_speed_test_ui(L)
+    # 🔥 關鍵修正：只有在登入狀態（auth_status 不為 None）時，才會顯示測速功能
+    if st.session_state.auth_status:
+        st.divider()
+        st.title(f"🚀 {L['speed_test']}")
+        from components import render_speed_test_ui
+        render_speed_test_ui(L)
 
 # --- 3. Telemetry 處理 ---
 headers = st.context.headers
@@ -117,7 +122,6 @@ for sid in list(global_devices.keys()):
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
 
-# 圖表數據更新
 new_tick = pd.DataFrame([{"time": current_now_str, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
@@ -132,11 +136,10 @@ fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_da
 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 分級渲染核心 (User: 歷史紀錄 | Admin: DataBase 全資料) ---
+# --- 5. 分級渲染核心 ---
 st.divider()
 
 if st.session_state.auth_status == "admin":
-    # 🏆 管理員專屬：雙分頁監控中心
     tab_active, tab_history = st.tabs(["Active Nodes", "Full Database Logs"])
     
     with tab_active:
@@ -150,33 +153,25 @@ if st.session_state.auth_status == "admin":
 
     with tab_history:
         st.subheader("🗄️ 全系統歷史測速數據庫")
-        all_logs = get_records() # Admin 抓全部
+        all_logs = get_records() 
         st.dataframe(all_logs, use_container_width=True, hide_index=True)
         
-        # 管理員清理權限
         if st.button("⚠️ 清空資料庫所有測速紀錄", type="primary"):
             clear_all_records()
             st.success("Database Cleared!")
             st.rerun()
 
 elif st.session_state.auth_status == "user":
-    # 👤 一般使用者：個人測速歷史紀錄 (永久儲存)
-    history_title = "📜 個人測速歷史紀錄" if st.session_state.lang == "繁體中文" else "📜 Personal Test History"
-    st.subheader(history_title)
-    
+    st.subheader(f"📜 {L['user_record']}")
     my_logs = get_records(st.session_state.username)
     if not my_logs.empty:
         st.dataframe(my_logs, use_container_width=True, hide_index=True)
         st.download_button("📥 " + L['export_btn'], my_logs.to_csv(index=False).encode('utf-8'), f"history_{user_id}.csv")
     else:
-        st.info("尚無數據。請點擊測速指令。")
-
-    # 模擬測速並存入 DB (測試用)
-    if st.button("模擬測速並寫入資料庫"):
-        add_record(st.session_state.username, random.randint(20, 50), random.randint(1, 5), "Pass ✅")
-        st.rerun()
+        st.info("💡 尚無數據。請使用側邊欄測速功能開始紀錄。" if st.session_state.lang == "繁體中文" else "No data. Please use the sidebar test function.")
 
 else:
+    # 訪客模式：隱藏清單並顯示鎖定提示
     st.warning(L['lock_msg'])
 
 st.markdown(f'<div class="ksr-footer">DEVELOPED BY {L["team_name"]} &copy; 2026.</div>', unsafe_allow_html=True)
