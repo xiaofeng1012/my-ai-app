@@ -68,29 +68,38 @@ with st.sidebar:
             st.rerun()
 
     # 🔥 側邊欄測速與「儲存」邏輯
+    # --- main.py 側邊欄測速處理區塊 ---
+    
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
         
-        # 這裡會渲染帶有「儲存結果」按鈕的 UI
+        # 1. 渲染 UI
         speed_result = render_speed_test_ui(L) 
         
         if speed_result and isinstance(speed_result, str):
             try:
                 data = json.loads(speed_result)
-                # 只有當 JS 觸發 action 為 save 時才入庫
                 if data.get("action") == "save":
                     mbps_val = data['mbps']
                     ts_val = data['ts']
                     
+                    # 2. 檢查重複性
                     if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
                         st.session_state.last_ts = ts_val
-                        with st.spinner("Syncing to Cloud..."):
-                            add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                            time.sleep(0.5) 
-                        st.toast(f"✅ Saved: {mbps_val} Mbps")
+                        
+                        # 🔹 優化點：移除 st.spinner 與 time.sleep
+                        # 直接寫入 DB，SQLite 寫入極快，不應該感知到卡頓
+                        add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                        
+                        # 🔹 使用 toast 代替 spinner，它是非阻塞的彈出訊息
+                        st.toast(f"🚀 數據已同步: {mbps_val} Mbps", icon="✅")
+                        
+                        # 🔹 稍微延遲後重整，確保資料庫寫入完成
+                        # 使用 st.rerun() 會重啟腳本，這是必要的，但我們不加 sleep 讓它瞬間完成
                         st.rerun() 
-            except: pass
+            except:
+                pass
 
 # --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
