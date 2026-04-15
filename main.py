@@ -1,4 +1,3 @@
-# main.py
 import streamlit as st
 import pandas as pd
 import requests
@@ -78,18 +77,15 @@ with st.sidebar:
                 data = json.loads(speed_json)
                 mbps_val, ts_val = data['mbps'], data['ts']
                 
-                # 判斷是否為新的測速結果
                 if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
                     st.session_state.last_ts = ts_val
-                    # 🔹 執行入庫
                     add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
                     st.toast(f"✅ Record Saved: {mbps_val} Mbps")
                     time.sleep(0.5)
                     st.rerun()
-            except: 
-                pass
+            except: pass
 
-# --- 4. Dashboard 視覺 ---
+# --- 4. Dashboard 數據運算 ---
 headers = st.context.headers
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
@@ -101,36 +97,60 @@ if st.session_state.auth_status:
         "name": st.session_state.username, "ip": ip, "ts": time.time(), "status": "Online 🟢"
     }
 
-st.title(f"📡 {L['title']}")
-m1, m2, m3, m4 = st.columns(4)
+# 更新模擬數據圖表
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
-# 1. 獲取當前使用者的所有紀錄來計算 SLA
+# 獲取紀錄來計算 SLA
 current_logs = get_records(st.session_state.username)
 
 if not current_logs.empty:
-    # 假設狀態包含 "Success" 或 "Pass" 代表達標
     success_count = len(current_logs[current_logs['狀態'].str.contains('Success|Pass', na=False)])
     total_count = len(current_logs)
-    sla_value = (success_count / total_count) * 100
-    sla_display = f"{sla_value:.1f}%"
+    sla_display = f"{(success_count / total_count) * 100:.1f}%"
 else:
-    # 若無紀錄，顯示初始狀態
     sla_display = "100%"
 
-# 2. 更新指標顯示
+# --- 5. Dashboard UI 渲染 ---
+st.title(f"📡 {L['title']}")
+m1, m2, m3, m4 = st.columns(4)
+
 m1.metric(L['m1'], f"{len(global_devices)}")
 m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
 m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
-m4.metric(L['m4'], sla_display) # 🔥 這裡改用計算後的變數
+m4.metric(L['m4'], sla_display)
 
 st.divider()
-fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
-fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
-st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 數據列表渲染 ---
+# 📊 平滑動畫圖表實作
+st.subheader(f"📊 {L['diag_title']}")
+
+fig = px.area(
+    st.session_state.chart_data, 
+    x="time", 
+    y="ms", 
+    template="plotly_dark", 
+    color_discrete_sequence=["#00f2ff"]
+)
+
+# 🔥 優化核心：設定過渡動畫與固定 Y 軸以減少閃爍
+fig.update_layout(
+    height=300, 
+    margin=dict(l=0, r=0, t=10, b=0),
+    xaxis_showgrid=False,
+    # 動畫設定
+    transition_duration=500,
+    transition_easing="cubic-in-out",
+    # 固定座標軸範圍，避免縮放閃爍
+    yaxis=dict(range=[0, 100], fixedrange=True, title="Latency (ms)"),
+    xaxis=dict(fixedrange=True, title=None)
+)
+
+# 使用預留容器渲染，避免全域重新排版
+chart_container = st.empty()
+chart_container.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+# --- 6. 數據列表渲染 ---
 st.divider()
 if st.session_state.auth_status == "admin":
     t1, t2 = st.tabs(["Active Nodes", "System Logs"])
@@ -143,15 +163,14 @@ if st.session_state.auth_status == "admin":
             st.rerun()
 elif st.session_state.auth_status == "user":
     st.subheader(f"📜 {L['user_record']}")
-    # 🔹 只抓取目前登入使用者的紀錄
-    my_logs = get_records(st.session_state.username)
-    if not my_logs.empty:
-        st.dataframe(my_logs, use_container_width=True, hide_index=True)
+    if not current_logs.empty:
+        st.dataframe(current_logs, use_container_width=True, hide_index=True)
     else:
         st.info("💡 目前無紀錄，請點擊左側測速按鈕。")
 else:
     st.warning(L['lock_msg'])
 
+# 底部版本宣告 (配合 language_pack)
 st.markdown(
     f"""
     <div class="ksr-footer">
