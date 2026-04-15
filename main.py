@@ -106,6 +106,25 @@ m1, m2, m3, m4 = st.columns(4)
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
+# 1. 獲取當前使用者的所有紀錄來計算 SLA
+current_logs = get_records(st.session_state.username)
+
+if not current_logs.empty:
+    # 假設狀態包含 "Success" 或 "Pass" 代表達標
+    success_count = len(current_logs[current_logs['狀態'].str.contains('Success|Pass', na=False)])
+    total_count = len(current_logs)
+    sla_value = (success_count / total_count) * 100
+    sla_display = f"{sla_value:.1f}%"
+else:
+    # 若無紀錄，顯示初始狀態
+    sla_display = "100%"
+
+# 2. 更新指標顯示
+m1.metric(L['m1'], f"{len(global_devices)}")
+m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
+m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
+m4.metric(L['m4'], sla_display) # 🔥 這裡改用計算後的變數
+
 m1.metric(L['m1'], f"{len(global_devices)}")
 m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
 m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
