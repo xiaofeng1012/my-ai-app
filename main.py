@@ -73,11 +73,27 @@ with st.sidebar:
             st.rerun()
 
     # 🔥 關鍵修正：只有在登入狀態（auth_status 不為 None）時，才會顯示測速功能
+    # main.py 側邊欄區塊修正
+
+    # 🔥 關鍵修正：登入後顯示測速並接收數據
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
-        from components import render_speed_test_ui
-        render_speed_test_ui(L)
+        
+        # 接收來自 JS 的 Mbps 數值
+        speed_val = render_speed_test_ui(L)
+        
+        # 如果抓到新的測速值 (且不等於上一次存檔的值)
+        if speed_val:
+            # 防止 autorefresh 導致同一筆數據每秒被存入資料庫一次
+            if "last_saved_speed" not in st.session_state or st.session_state.last_saved_speed != speed_val:
+                st.session_state.last_saved_speed = speed_val
+                
+                # 寫入 SQLite (RTT 暫用 Mbps 代替)
+                add_record(st.session_state.username, float(speed_val), 0.0, "Success ✅")
+                
+                # 強制刷新，讓下方的紀錄表格立刻更新
+                st.rerun()
 
 # --- 3. Telemetry 處理 ---
 headers = st.context.headers
