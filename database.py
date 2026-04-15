@@ -1,6 +1,7 @@
 # database.py
 import sqlite3
 import hashlib
+import pandas as pd
 
 def init_db():
     conn = sqlite3.connect('ksr_network.db')
