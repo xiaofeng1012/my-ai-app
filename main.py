@@ -73,31 +73,33 @@ with st.sidebar:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
         
-        # 調用剛才改好的帶有 Loader 的 UI
+        # 呼叫我們之前寫好的 render_speed_test_ui (含 JS Loader 那個版本)
         speed_json = render_speed_test_ui(L)
         
         if speed_json:
             try:
                 data = json.loads(speed_json)
-                # 只有當 status 為 done 且時間戳記不同時才寫入
+                # 判斷 JS 是否回傳了完成狀態
                 if data.get("status") == "done":
                     mbps_val = data['mbps']
                     ts_val = data['ts']
                     
+                    # 檢查是否為重複發送的數據
                     if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
-                        # 顯示一個暫時的讀取狀態在 Streamlit
-                        with st.status("📡 Data uploading to DB...", expanded=False) as status:
-                            st.session_state.last_ts = ts_val
-                            # 執行寫入資料庫
-                            add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                            time.sleep(0.8) # 模擬網路延遲，讓使用者有感
-                            status.update(label="✅ Upload Complete!", state="complete", expanded=False)
+                        st.session_state.last_ts = ts_val
                         
-                        st.toast(f"Saved: {mbps_val} Mbps")
-                        # 強制重整，讓下方的清單立刻更新
-                        st.rerun()
+                        # 1. 執行資料庫寫入
+                        add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                        
+                        # 2. 顯示成功提示
+                        st.toast(f"✅ 已成功存入資料庫: {mbps_val} Mbps")
+                        
+                        # 3. 關鍵一步：給予極短的緩衝並強制全頁重整
+                        # 這樣 get_records 才會被重新執行，清單才會出現最新一筆
+                        time.sleep(0.5) 
+                        st.rerun() 
             except Exception as e:
-                pass
+                st.error(f"數據同步錯誤: {e}")
 
 # --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
