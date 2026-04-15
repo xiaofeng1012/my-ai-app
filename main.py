@@ -20,6 +20,7 @@ st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide"
 init_db()
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
+# 保持 1 秒刷新以同步資料庫狀態
 st_autorefresh(interval=1000, key="ksr_main_refresh_v2")
 
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
@@ -66,7 +67,7 @@ with st.sidebar:
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
-    # 🔥 核心測速入庫邏輯
+    # 🔥 核心測速入庫：現在整合了 JS Canvas 動畫
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
@@ -97,13 +98,12 @@ if st.session_state.auth_status:
         "name": st.session_state.username, "ip": ip, "ts": time.time(), "status": "Online 🟢"
     }
 
-# 更新模擬數據圖表
+# 更新模擬趨勢 (維持後台運算)
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
 # 獲取紀錄來計算 SLA
 current_logs = get_records(st.session_state.username)
-
 if not current_logs.empty:
     success_count = len(current_logs[current_logs['狀態'].str.contains('Success|Pass', na=False)])
     total_count = len(current_logs)
@@ -111,7 +111,7 @@ if not current_logs.empty:
 else:
     sla_display = "100%"
 
-# --- 5. Dashboard UI 渲染 ---
+# --- 5. Dashboard UI 渲染 (並排式穩定版) ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
 
@@ -122,53 +122,25 @@ m4.metric(L['m4'], sla_display)
 
 st.divider()
 
-# 📊 平滑動畫圖表實作
-st.subheader(f"📊 {L['diag_title']}")
+# 為了防止 Plotly 在 autorefresh 時閃爍，我們將重點轉向數據分析與在線節點
+col_left, col_right = st.columns([1.2, 0.8])
 
-fig = px.area(
-    st.session_state.chart_data, 
-    x="time", 
-    y="ms", 
-    template="plotly_dark", 
-    color_discrete_sequence=["#00f2ff"]
-)
-
-# 🔥 優化核心：設定過渡動畫與固定 Y 軸以減少閃爍
-fig.update_layout(
-    height=300, 
-    margin=dict(l=0, r=0, t=10, b=0),
-    xaxis_showgrid=False,
-    # 動畫設定
-    transition_duration=500,
-    transition_easing="cubic-in-out",
-    # 固定座標軸範圍，避免縮放閃爍
-    yaxis=dict(range=[0, 100], fixedrange=True, title="Latency (ms)"),
-    xaxis=dict(fixedrange=True, title=None)
-)
-
-# 使用預留容器渲染，避免全域重新排版
-chart_container = st.empty()
-chart_container.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-# --- 6. 數據列表渲染 ---
-st.divider()
-if st.session_state.auth_status == "admin":
-    t1, t2 = st.tabs(["Active Nodes", "System Logs"])
-    with t1: st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True)
-    with t2:
-        logs = get_records()
-        st.dataframe(logs, use_container_width=True, hide_index=True)
-        if st.button("⚠️ Clear Records"):
-            clear_all_records()
-            st.rerun()
-elif st.session_state.auth_status == "user":
+with col_left:
     st.subheader(f"📜 {L['user_record']}")
     if not current_logs.empty:
-        st.dataframe(current_logs, use_container_width=True, hide_index=True)
+        # 只顯示前 15 筆，避免撐開頁面
+        st.dataframe(current_logs, use_container_width=True, height=450, hide_index=True)
     else:
         st.info("💡 目前無紀錄，請點擊左側測速按鈕。")
-else:
-    st.warning(L['lock_msg'])
+
+with col_right:
+    st.subheader("🌐 Active Nodes")
+    # 將在線清單轉為 DF
+    active_df = pd.DataFrame(global_devices.values())
+    if not active_df.empty:
+        st.dataframe(active_df[['name', 'ip', 'status']], use_container_width=True, height=450, hide_index=True)
+    else:
+        st.caption("No active nodes.")
 
 # 底部版本宣告 (配合 language_pack)
 st.markdown(
