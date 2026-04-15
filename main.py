@@ -22,6 +22,7 @@ tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 st_autorefresh(interval=1000, key="data_refresh_1s")
 
+# 初始化狀態
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
 if 'auth_status' not in st.session_state: st.session_state.auth_status = None
 if 'username' not in st.session_state: st.session_state.username = "Guest"
@@ -82,15 +83,26 @@ headers = st.context.headers
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 current_now_str = datetime.now(tw_tz).strftime("%H:%M:%S")
 
-# 使用「帳號」為唯一辨識碼
+@st.cache_data(ttl=86400)
+def get_loc_pro(ip_addr):
+    if ip_addr in ["127.0.0.1", "localhost"]: return {"country": "Taiwan"}
+    try:
+        r = requests.get(f"http://ip-api.com/json/{ip_addr}?lang=en", timeout=3).json()
+        return r if r.get('status') == 'success' else {"country": "Taiwan"}
+    except: return {"country": "Taiwan"}
+
+loc = get_loc_pro(ip)
+display_country = loc.get('country', "Taiwan")
 user_id = st.session_state.username
+
+# 全域清單與緩存
 global_devices = st.cache_resource(lambda: {})()
 
 # 只有在登入狀態才紀錄心跳
 if st.session_state.auth_status:
     global_devices[user_id] = {
         "name": user_id,
-        "location": "Taiwan", # 此處可連動 get_loc 邏輯
+        "location": display_country, 
         "last": current_now_str,
         "ts": time.time(),
         "status": "Online 🟢" if st.session_state.lang == "繁體中文" else "Online 🟢"
@@ -99,14 +111,17 @@ if st.session_state.auth_status:
 # 清理離線節點
 ct = time.time()
 for sid in list(global_devices.keys()):
-    if ct - global_devices[sid]["ts"] > 10:
+    time_diff = ct - global_devices[sid]["ts"]
+    if time_diff > 10 and "🟢" in global_devices[sid]["status"]:
         global_devices[sid]["status"] = "Offline 🔴" if st.session_state.lang == "繁體中文" else "Offline 🔴"
-    if ct - global_devices[sid]["ts"] > 60: del global_devices[sid]
+        global_devices[sid]["last"] = datetime.now(tw_tz).strftime("%H:%M:%S")
+    if time_diff > 60: del global_devices[sid]
 
 # --- 4. Dashboard 主介面 ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
-# 更新分析圖數據
+
+# 更新圖表數據
 new_tick = pd.DataFrame([{"time": current_now_str, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
@@ -118,27 +133,39 @@ m4.metric(L['m4'], "99.9%")
 st.divider()
 st.subheader(f"📊 {L['diag_title']}")
 fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
+fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 分級清單渲染 ---
+# --- 5. 分級清單渲染 (修正 AttributeError 處) ---
 st.divider()
 if st.session_state.auth_status == "admin":
     st.subheader(f"📋 {L['db_title']}")
-    # 動態欄位名稱切換
-    admin_df = pd.DataFrame([{
-        L['unit_name']: v['name'],
-        L['location']: v['location'],
-        "Status": v['status'],
-        L['last_seen']: v['last']
-    } for v in global_devices.values()])
-    st.table(admin_df if not admin_df.empty else pd.DataFrame())
+    # 建立 Admin 視圖表格
+    admin_list = []
+    for v in global_devices.values():
+        admin_list.append({
+            L['unit_name']: v['name'],
+            L['location']: v['location'],
+            "Status": v['status'],
+            L['last_seen']: v['last']
+        })
+    st.table(pd.DataFrame(admin_list) if admin_list else pd.DataFrame())
+    
+    from utils import generate_csv_report
     st.download_button(L['export_btn'], generate_csv_report(st.session_state.chart_data, "ADMIN", "ALL", "KSR"), "ksr_audit.csv")
 
-elif st.session_status == "user":
+# 🔥 這裡修正了 st.session_status 為 st.session_state.auth_status
+elif st.session_state.auth_status == "user":
     st.subheader(f"📋 {L['user_record']}: {user_id}")
     if user_id in global_devices:
         v = global_devices[user_id]
-        st.table(pd.DataFrame([{L['unit_name']: v['name'], L['location']: v['location'], "Status": v['status'], L['last_seen']: v['last']}]))
+        user_list = [{
+            L['unit_name']: v['name'],
+            L['location']: v['location'],
+            "Status": v['status'],
+            L['last_seen']: v['last']
+        }]
+        st.table(pd.DataFrame(user_list))
 else:
     st.warning(L['lock_msg'])
 
