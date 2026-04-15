@@ -34,3 +34,31 @@ def login_user(username, password):
     result = c.fetchone()
     conn.close()
     return result[0] if result else None
+
+# 🔥 新增：儲存紀錄
+def add_record(username, rtt, jitter, status):
+    conn = sqlite3.connect('ksr_network.db')
+    c = conn.cursor()
+    now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO test_records (username, timestamp, rtt, jitter, status) VALUES (?, ?, ?, ?, ?)",
+              (username, now, rtt, jitter, status))
+    conn.commit()
+    conn.close()
+
+# 🔥 新增：讀取紀錄 (User 看自己, Admin 看全部)
+def get_records(username=None):
+    conn = sqlite3.connect('ksr_network.db')
+    if username and username != "Admin":
+        df = pd.read_sql_query("SELECT timestamp, rtt, jitter, status FROM test_records WHERE username=?", conn, params=(username,))
+    else:
+        df = pd.read_sql_query("SELECT * FROM test_records", conn)
+    conn.close()
+    return df
+
+# 🔥 新增：清理紀錄 (僅限 Admin)
+def clear_all_records():
+    conn = sqlite3.connect('ksr_network.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM test_records")
+    conn.commit()
+    conn.close()
