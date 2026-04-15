@@ -149,7 +149,7 @@ elif st.session_state.auth_status == "user":
     # 如果想給 User 看一點點數據，可以用小卡片
     c1, c2 = st.columns(2)
     with c1:
-        st.help("測速說明：點擊側邊欄「開始測試」後，滿意結果請點擊「儲存」按鈕同步至資料庫。")
+        st.info("測速說明：點擊側邊欄「開始測試」後，滿意結果請點擊「儲存」按鈕同步至資料庫。")
 
 else:
     # 未登入
