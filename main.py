@@ -21,8 +21,8 @@ init_db()
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 
-# 🔄 2秒刷新，兼顧即時性與防止捲軸跳動
-st_autorefresh(interval=2000, key="ksr_refresh_final_admin")
+# 🔄 2秒刷新，維持 Dashboard 指標更新
+st_autorefresh(interval=2000, key="ksr_refresh_v10")
 
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
 if 'auth_status' not in st.session_state: st.session_state.auth_status = None
@@ -62,60 +62,51 @@ with st.sidebar:
                 if register_user(ru, rp): st.success(L['reg_success'])
                 else: st.error(L['err_exists'])
     else:
-        st.success(f"👤 {L['auth_welcome']}, {st.session_state.username} ({st.session_state.auth_status})")
+        st.success(f"👤 {L['auth_welcome']}, {st.session_state.username}")
         if st.button(L['auth_logout'], use_container_width=True):
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
-    
-    # --- main.py 側邊欄測速處理 ---
-    
+    # 🔥 側邊欄測速與「儲存」邏輯
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
         
-        # 1. 這裡會渲染 UI 並捕捉 JS 回傳的 JSON 字串
-        # 注意：如果 JS 還沒回傳，speed_result 就會是 None
+        # 這裡會渲染帶有「儲存結果」按鈕的 UI
         speed_result = render_speed_test_ui(L) 
         
-        if speed_result is not None:
+        if speed_result and isinstance(speed_result, str):
             try:
-                # 2. 只有當它真的是字串時才解析
-                if isinstance(speed_result, str):
-                    data = json.loads(speed_result)
+                data = json.loads(speed_result)
+                # 只有當 JS 觸發 action 為 save 時才入庫
+                if data.get("action") == "save":
+                    mbps_val = data['mbps']
+                    ts_val = data['ts']
                     
-                    if data.get("status") == "done":
-                        mbps_val = data['mbps']
-                        ts_val = data['ts']
-                        
-                        if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
-                            st.session_state.last_ts = ts_val
-                            
-                            # 3. 顯示入庫中的狀態
-                            with st.spinner("Writing to DB..."):
-                                add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                                time.sleep(0.5) 
-                            
-                            st.toast(f"✅ Saved: {mbps_val} Mbps")
-                            st.rerun() # 🚀 強制全頁刷新，清單就會出現了！
-            except Exception as e:
-                # 這裡就不會再跳 DeltaGenerator 的錯誤了
-                pass
+                    if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
+                        st.session_state.last_ts = ts_val
+                        with st.spinner("Syncing to Cloud..."):
+                            add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                            time.sleep(0.5) 
+                        st.toast(f"✅ Saved: {mbps_val} Mbps")
+                        st.rerun() 
+            except: pass
+
 # --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
 new_tick = pd.DataFrame([{"time": current_time, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-25:]
 
-# 在線節點模擬與數據獲取
+# 在線節點模擬
 global_devices = st.cache_resource(lambda: {})()
 if st.session_state.auth_status:
     global_devices[st.session_state.username] = {"name": st.session_state.username, "ip": "127.0.0.1", "ts": time.time(), "status": "Online 🟢"}
 
-# --- 5. Dashboard UI 渲染 ---
+# --- 5. Dashboard UI 渲染 (大視覺區) ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
 
-# 獲取紀錄計算 SLA
+# 獲取紀錄計算指標 (SLA 依然保留以利監控品質)
 user_logs = get_records(st.session_state.username)
 sla_val = f"{(len(user_logs[user_logs['狀態'].str.contains('Pass|Success', na=False)]) / len(user_logs)) * 100:.1f}%" if not user_logs.empty else "100%"
 
@@ -126,35 +117,42 @@ m4.metric(L['m4'], sla_val)
 
 st.divider()
 
-# 📊 圖表區 (縮減高度防止置頂問題)
+# 📊 分析圖 (固定高度以防閃爍置頂)
 fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
-fig.update_layout(height=220, margin=dict(l=0, r=0, t=5, b=5), xaxis_showgrid=False, transition_duration=400, yaxis=dict(range=[0, 100], fixedrange=True, title=None))
+fig.update_layout(
+    height=260, 
+    margin=dict(l=0, r=0, t=10, b=0), 
+    xaxis_showgrid=False, 
+    transition_duration=400, 
+    yaxis=dict(range=[0, 100], fixedrange=True, title=None),
+    xaxis=dict(fixedrange=True, title=None)
+)
 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-# --- 6. 權限分級內容渲染 (重點修復) ---
+# --- 6. 權限分級內容渲染 ---
 st.divider()
 
 if st.session_state.auth_status == "admin":
-    # 👑 Admin 模式：Tab 分頁顯示全系統資訊
+    # 👑 Admin 模式：顯示完整管理面板
     st.subheader("🛠️ Admin Control Panel")
     t_nodes, t_logs = st.tabs(["🌐 Active Nodes", "📜 All System Logs"])
     with t_nodes:
-        st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True, height=250, hide_index=True)
+        st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True, height=300, hide_index=True)
     with t_logs:
-        full_logs = get_records() # Admin 讀取全部
-        st.dataframe(full_logs, use_container_width=True, height=250, hide_index=True)
-        if st.button("⚠️ Clear All Database Records", type="primary"):
+        st.dataframe(get_records(), use_container_width=True, height=300, hide_index=True)
+        if st.button("⚠️ Clear Database", type="primary"):
             clear_all_records(); st.rerun()
 
 elif st.session_state.auth_status == "user":
-    # 👤 一般用戶：僅顯示個人紀錄
-    st.subheader(f"📜 {L['user_record']}")
-    if not user_logs.empty:
-        st.dataframe(user_logs, use_container_width=True, height=300, hide_index=True)
-    else:
-        st.info("💡 目前無紀錄，請啟動測速。")
+    # 👤 一般用戶：主畫面保持乾淨，僅顯示資訊卡
+    st.info(f"💡 {L['version_info']} 運行中。您的測速紀錄已加密儲存於雲端，您可以隨時在側邊欄啟動即時監控。")
+    # 如果想給 User 看一點點數據，可以用小卡片
+    c1, c2 = st.columns(2)
+    with c1:
+        st.help("測速說明：點擊側邊欄「開始測試」後，滿意結果請點擊「儲存」按鈕同步至資料庫。")
 
 else:
+    # 未登入
     st.warning(L['lock_msg'])
 
 # Footer
