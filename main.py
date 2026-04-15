@@ -1,3 +1,4 @@
+# main.py
 import streamlit as st
 import pandas as pd
 import requests
@@ -20,7 +21,7 @@ st.set_page_config(page_title="卡式如通訊品質監測平台", layout="wide"
 init_db()
 tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
-st_autorefresh(interval=1000, key="ksr_main_refresh")
+st_autorefresh(interval=1000, key="ksr_main_refresh_v2")
 
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
 if 'auth_status' not in st.session_state: st.session_state.auth_status = None
@@ -66,7 +67,7 @@ with st.sidebar:
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
-    # 🔥 關鍵修正：測速邏輯與 JSON 解析
+    # 🔥 核心測速入庫邏輯
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
@@ -74,36 +75,31 @@ with st.sidebar:
         
         if speed_json:
             try:
-                # 解析前端傳回的包裹
-                res_data = json.loads(speed_json)
-                mbps_val = res_data['mbps']
-                ts_val = res_data['ts']
+                data = json.loads(speed_json)
+                mbps_val, ts_val = data['mbps'], data['ts']
                 
-                # 只有當 timestamp 真正更新時才執行存檔 (避免 autorefresh 重複存)
+                # 判斷是否為新的測速結果
                 if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
                     st.session_state.last_ts = ts_val
                     # 🔹 執行入庫
-                    add_record(st.session_state.username, float(mbps_val), 0.0, "Success ✅")
-                    st.toast(f"✅ Record Logged: {mbps_val} Mbps")
+                    add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                    st.toast(f"✅ Record Saved: {mbps_val} Mbps")
                     time.sleep(0.5)
                     st.rerun()
-            except Exception as e:
+            except: 
                 pass
 
-# --- 4. Dashboard 數據展示 ---
+# --- 4. Dashboard 視覺 ---
 headers = st.context.headers
 ip = headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
 
+# 即時狀態紀錄
 global_devices = st.cache_resource(lambda: {})()
 if st.session_state.auth_status:
     global_devices[st.session_state.username] = {
         "name": st.session_state.username, "ip": ip, "ts": time.time(), "status": "Online 🟢"
     }
-
-# 清理離線節點
-for sid in list(global_devices.keys()):
-    if time.time() - global_devices[sid]["ts"] > 60: del global_devices[sid]
 
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
@@ -120,23 +116,23 @@ fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_da
 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 數據列表 ---
+# --- 5. 數據列表渲染 ---
 st.divider()
 if st.session_state.auth_status == "admin":
     t1, t2 = st.tabs(["Active Nodes", "System Logs"])
-    with t1: st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True, hide_index=True)
+    with t1: st.dataframe(pd.DataFrame(global_devices.values()), use_container_width=True)
     with t2:
         logs = get_records()
         st.dataframe(logs, use_container_width=True, hide_index=True)
-        if st.button("⚠️ Clear All Records"):
+        if st.button("⚠️ Clear Records"):
             clear_all_records()
             st.rerun()
 elif st.session_state.auth_status == "user":
     st.subheader(f"📜 {L['user_record']}")
+    # 🔹 只抓取目前登入使用者的紀錄
     my_logs = get_records(st.session_state.username)
     if not my_logs.empty:
         st.dataframe(my_logs, use_container_width=True, hide_index=True)
-        st.download_button("📥 Export CSV", my_logs.to_csv(index=False).encode('utf-8'), f"logs_{st.session_state.username}.csv")
     else:
         st.info("💡 目前無紀錄，請點擊左側測速按鈕。")
 else:
