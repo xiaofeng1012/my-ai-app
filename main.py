@@ -22,7 +22,6 @@ tw_tz = timezone(timedelta(hours=8))
 apply_ksr_styles()
 st_autorefresh(interval=1000, key="data_refresh_1s")
 
-# 初始化狀態
 if 'lang' not in st.session_state: st.session_state.lang = "繁體中文"
 if 'auth_status' not in st.session_state: st.session_state.auth_status = None
 if 'username' not in st.session_state: st.session_state.username = "Guest"
@@ -30,7 +29,6 @@ if 'chart_data' not in st.session_state: st.session_state.chart_data = pd.DataFr
 
 # --- 2. 側邊欄：登入與語系 ---
 with st.sidebar:
-    # 數位時鐘
     st.markdown(f"""
         <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; border-left: 5px solid #00f2ff; margin-bottom: 20px;">
             <p style="margin:0; color: #8b949e; font-size: 0.75rem; letter-spacing: 1px;">SYSTEM REAL-TIME (UTC+8)</p>
@@ -40,13 +38,11 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-    # 語系切換
     st.session_state.lang = st.selectbox("🌐 Language", ["繁體中文", "English"], 
                                        index=0 if st.session_state.lang == "繁體中文" else 1)
     L = lang_pack[st.session_state.lang]
     st.divider()
 
-    # 登入註冊系統
     st.title(f"🔐 {L['login_section']}")
     if st.session_state.auth_status is None:
         tab1, tab2 = st.tabs([L['tab_login'], L['tab_register']])
@@ -94,19 +90,23 @@ def get_loc_pro(ip_addr):
 loc = get_loc_pro(ip)
 display_country = loc.get('country', "Taiwan")
 user_id = st.session_state.username
-
-# 全域清單與緩存
 global_devices = st.cache_resource(lambda: {})()
 
-# 只有在登入狀態才紀錄心跳
+# 🔥 核心修正：初次登入與心跳紀錄 (加入 IP 與 Start Time)
 if st.session_state.auth_status:
-    global_devices[user_id] = {
-        "name": user_id,
-        "location": display_country, 
-        "last": current_now_str,
-        "ts": time.time(),
-        "status": "Online 🟢" if st.session_state.lang == "繁體中文" else "Online 🟢"
-    }
+    if user_id not in global_devices:
+        global_devices[user_id] = {
+            "name": user_id,
+            "ip": ip,
+            "location": display_country, 
+            "start_time": current_now_str, # 紀錄登入那一刻
+            "last": current_now_str,
+            "ts": time.time(),
+            "status": "Online 🟢" if st.session_state.lang == "繁體中文" else "Online 🟢"
+        }
+    else:
+        global_devices[user_id]["ts"] = time.time()
+        global_devices[user_id]["status"] = "Online 🟢" if st.session_state.lang == "繁體中文" else "Online 🟢"
 
 # 清理離線節點
 ct = time.time()
@@ -120,8 +120,6 @@ for sid in list(global_devices.keys()):
 # --- 4. Dashboard 主介面 ---
 st.title(f"📡 {L['title']}")
 m1, m2, m3, m4 = st.columns(4)
-
-# 更新圖表數據
 new_tick = pd.DataFrame([{"time": current_now_str, "ms": random.randint(22, 55)}])
 st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_tick], ignore_index=True).iloc[-30:]
 
@@ -136,25 +134,44 @@ fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_da
 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. 分級清單渲染 (修正 AttributeError 處) ---
+# --- 5. 分級清單渲染 (Admin 專屬控制台) ---
 st.divider()
 if st.session_state.auth_status == "admin":
     st.subheader(f"📋 {L['db_title']}")
-    # 建立 Admin 視圖表格
-    admin_list = []
+    
+    # 🔥 管理員專屬：全維度數據中心 (ID, IP, 地理位置, 使用時間, 最後活動)
+    col_ip_title = "IP Address" if st.session_state.lang == "English" else "網路位址 (IP)"
+    col_start_title = "Session Start" if st.session_state.lang == "English" else "登入使用時間"
+    
+    admin_data = []
     for v in global_devices.values():
-        admin_list.append({
+        admin_data.append({
             L['unit_name']: v['name'],
+            col_ip_title: v['ip'],
             L['location']: v['location'],
-            "Status": v['status'],
-            L['last_seen']: v['last']
+            col_start_title: v['start_time'],
+            L['last_seen']: v['last'],
+            "Status": v['status']
         })
-    st.table(pd.DataFrame(admin_list) if admin_list else pd.DataFrame())
+    
+    # 使用互動式 dataframe 替代簡單表格
+    df_admin = pd.DataFrame(admin_data)
+    if not df_admin.empty:
+        st.dataframe(
+            df_admin, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Status": st.column_config.TextColumn("Status", width="small"),
+                col_ip_title: st.column_config.TextColumn(col_ip_title, width="medium")
+            }
+        )
+    else:
+        st.info("Currently no active users in database.")
     
     from utils import generate_csv_report
-    st.download_button(L['export_btn'], generate_csv_report(st.session_state.chart_data, "ADMIN", "ALL", "KSR"), "ksr_audit.csv")
+    st.download_button(L['export_btn'], generate_csv_report(st.session_state.chart_data, "ADMIN", "ROOT", "KSR"), "ksr_admin_audit.csv")
 
-# 🔥 這裡修正了 st.session_status 為 st.session_state.auth_status
 elif st.session_state.auth_status == "user":
     st.subheader(f"📋 {L['user_record']}: {user_id}")
     if user_id in global_devices:
