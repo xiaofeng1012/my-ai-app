@@ -125,11 +125,6 @@ m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
 m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
 m4.metric(L['m4'], sla_display) # 🔥 這裡改用計算後的變數
 
-m1.metric(L['m1'], f"{len(global_devices)}")
-m2.metric(L['m2'], f"{st.session_state.chart_data['ms'].iloc[-1]} ms")
-m3.metric(L['m3'], f"{np.std(st.session_state.chart_data['ms']):.2f} ms")
-m4.metric(L['m4'], "99.9%")
-
 st.divider()
 fig = px.area(st.session_state.chart_data, x="time", y="ms", template="plotly_dark", color_discrete_sequence=["#00f2ff"])
 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_showgrid=False)
