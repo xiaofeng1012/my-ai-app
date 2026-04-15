@@ -67,20 +67,37 @@ with st.sidebar:
             st.session_state.auth_status, st.session_state.username = None, "Guest"
             st.rerun()
 
+    # --- main.py 側邊欄內的測速處理區 ---
+    
     if st.session_state.auth_status:
         st.divider()
         st.title(f"🚀 {L['speed_test']}")
+        
+        # 調用剛才改好的帶有 Loader 的 UI
         speed_json = render_speed_test_ui(L)
+        
         if speed_json:
             try:
                 data = json.loads(speed_json)
-                mbps_val, ts_val = data['mbps'], data['ts']
-                if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
-                    st.session_state.last_ts = ts_val
-                    add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
-                    st.toast(f"✅ Record Logged: {mbps_val} Mbps")
-                    time.sleep(0.5); st.rerun()
-            except: pass
+                # 只有當 status 為 done 且時間戳記不同時才寫入
+                if data.get("status") == "done":
+                    mbps_val = data['mbps']
+                    ts_val = data['ts']
+                    
+                    if "last_ts" not in st.session_state or st.session_state.last_ts != ts_val:
+                        # 顯示一個暫時的讀取狀態在 Streamlit
+                        with st.status("📡 Data uploading to DB...", expanded=False) as status:
+                            st.session_state.last_ts = ts_val
+                            # 執行寫入資料庫
+                            add_record(st.session_state.username, float(mbps_val), 0.0, "Pass ✅")
+                            time.sleep(0.8) # 模擬網路延遲，讓使用者有感
+                            status.update(label="✅ Upload Complete!", state="complete", expanded=False)
+                        
+                        st.toast(f"Saved: {mbps_val} Mbps")
+                        # 強制重整，讓下方的清單立刻更新
+                        st.rerun()
+            except Exception as e:
+                pass
 
 # --- 4. Dashboard 數據處理 ---
 current_time = datetime.now(tw_tz).strftime("%H:%M:%S")
